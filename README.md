@@ -1,5 +1,8 @@
 # UnifiedSim
 
+[![CI](https://github.com/Jameshunter1/unifiedsim/actions/workflows/ci.yml/badge.svg)](https://github.com/Jameshunter1/unifiedsim/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A local-first World of Warcraft simulation runner: import a character, sim gear
 and talent variations against SimulationCraft, and track DPS over time.
 

@@ -26,5 +26,15 @@
     "desktop:pack": "npm run build && node scripts/pack-desktop.mjs --dir",
     "desktop:dist": "npm run build && node scripts/pack-desktop.mjs",
     "icons": "node scripts/make-icons.mjs"
-  }
+  },
+  "license": "MIT",
+  "author": "Jameshunter1",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jameshunter1/unifiedsim.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Jameshunter1/unifiedsim/issues"
+  },
+  "homepage": "https://github.com/Jameshunter1/unifiedsim#readme"
 }
