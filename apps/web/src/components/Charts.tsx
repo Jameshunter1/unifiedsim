@@ -36,7 +36,9 @@ function hBarPath(x: number, y: number, w: number, h: number, r = 4): string {
   ].join(' ');
 }
 
-function useWidth<T extends HTMLElement>(): [React.RefObject<T>, number] {
+// React 19 narrowed RefObject<T> to a non-nullable current, so a ref seeded with
+// null is RefObject<T | null>.
+function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
   const ref = useRef<T>(null);
   const [width, setWidth] = useState(640);
 
