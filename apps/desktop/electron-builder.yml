@@ -78,6 +78,9 @@ linux:
   icon: resources/icon.png
   category: Game
   target: [AppImage]
+  # Defaults to the npm package name, and "@usim/desktop" collapses to
+  # "@usimdesktop", which AppImage rejects as a path component.
+  executableName: unifiedsim
 
 # No code signing configured. On Windows this means SmartScreen warns on first
 # run, and Smart App Control -- which is enforced on some machines -- may refuse
