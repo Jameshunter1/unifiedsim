@@ -1,0 +1,43 @@
+name: Feature request
+description: Suggest a capability
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do
+      description: >
+        The underlying goal, not the implementation. "I want to know which
+        trinket to equip" leads somewhere better than "add a dropdown".
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Which part
+      options:
+        - Simulation engines
+        - Desktop app / UI
+        - In-game addon
+        - Profile parsing
+        - Packaging and distribution
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: scale
+    attributes:
+      label: How much work would it be simulating
+      description: >
+        For anything that searches gear combinations, an estimate matters. The
+        app shows the exhaustive permutation count for the loaded profile —
+        anything past a few hundred needs more than one machine.

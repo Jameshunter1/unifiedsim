@@ -1,0 +1,71 @@
+name: Bug report
+description: Something behaves incorrectly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: the header of the app shows each engine's real state and,
+        when one is unavailable, the reason. That message is usually the answer.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got instead.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options:
+        - Desktop app (npm run desktop)
+        - Packaged build
+        - Browser (npm run dev)
+        - In-game addon
+        - CLI script
+    validations:
+      required: true
+
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Engine
+      options:
+        - local-simc
+        - docker-simc
+        - Not engine related
+        - No engine available
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, `node -v`, and the engine version from the app header.
+      placeholder: |
+        Windows 11 26200
+        node v24.18.0
+        SimulationCraft 1210-01 for World of Warcraft 12.1.0.69382
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: >
+        Server output, and the run's Engine log pane if a simulation failed.
+      render: text
+
+  - type: textarea
+    id: profile
+    attributes:
+      label: Profile
+      description: >
+        The `/simc` export, if relevant. It contains a character and realm name
+        and nothing else identifying — redact if you would rather not share it.
+      render: text

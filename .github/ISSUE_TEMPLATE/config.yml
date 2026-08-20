@@ -1,0 +1,12 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Architecture and design rationale
+    url: https://github.com/Jameshunter1/unifiedsim/blob/main/docs/adr/README.md
+    about: >
+      Why the bridge is not Rust, why the shell is not Tauri, why there is no
+      SQLite. Worth a look before proposing a change to any of them.
+  - name: SimulationCraft
+    url: https://github.com/simulationcraft/simc
+    about: >
+      Simulation accuracy, spell behaviour and APL issues belong upstream — this
+      project runs simc, it does not model the game.
