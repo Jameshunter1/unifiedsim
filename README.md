@@ -28,6 +28,8 @@ The server runs *inside* the desktop app's main process — one process, no port
 handshake, no orphaned server if the window dies, and native status (taskbar
 progress, tray, notifications) that keeps updating with the window closed.
 
+![UnifiedSim comparing four talent loadouts, with the per-ability damage breakdown for the selected run](docs/images/unifiedsim.png)
+
 ## Setup
 
 ```bash
