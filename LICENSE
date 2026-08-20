@@ -19,11 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-This project runs SimulationCraft; it does not include or link it.
-SimulationCraft is a separate work licensed under the GNU General Public
-License v3.0 — https://github.com/simulationcraft/simc. `npm run simc:fetch`
-downloads an upstream binary and `npm run simc:docker` builds one from upstream
-source; neither is distributed as part of this repository.

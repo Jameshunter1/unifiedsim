@@ -227,6 +227,7 @@ more than one machine, and why the engine interface has a distributed slot.
 | [docs/adr/](docs/adr/README.md) | Why it is built this way — 14 decision records |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, the rules a PR is held to, and how to work on the addon |
 | [engine-wasm/README.md](engine-wasm/README.md) | What porting simc to WebAssembly actually involves |
+| [NOTICE.md](NOTICE.md) | Third-party notices — simc is GPL-3.0 and is run, not bundled |
 
 Four decisions depart from the original design brief — the bridge, the desktop
 shell, the WASM entry point and the addon's snapshot timing. Each has an ADR
