@@ -1,0 +1,35 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # Electron ships a new major roughly every eight weeks and supports only the
+    # latest three, so an unattended project silently ends up on an end-of-life
+    # runtime with no security patches. That already happened here once.
+    groups:
+      electron:
+        patterns:
+          - electron
+          - electron-builder
+          - '@electron/*'
+      types:
+        patterns:
+          - '@types/*'
+      dev-tooling:
+        patterns:
+          - typescript
+          - vite
+          - '@vitejs/*'
+          - tsx
+    commit-message:
+      prefix: 'chore(deps)'
+      prefix-development: 'chore(deps-dev)'
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: 'chore(ci)'

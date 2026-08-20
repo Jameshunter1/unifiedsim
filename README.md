@@ -228,6 +228,13 @@ more than one machine, and why the engine interface has a distributed slot.
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, the rules a PR is held to, and how to work on the addon |
 | [engine-wasm/README.md](engine-wasm/README.md) | What porting simc to WebAssembly actually involves |
 | [NOTICE.md](NOTICE.md) | Third-party notices — simc is GPL-3.0 and is run, not bundled |
+| [SECURITY.md](SECURITY.md) | What is in scope, and the two alarming-looking things that are intentional |
+
+Planned work is tracked in
+[milestones](https://github.com/Jameshunter1/unifiedsim/milestones), roughly:
+trustworthy distribution (code signing), verifying the addon in game, the
+upgrade planner, a WebAssembly engine, distributed search, and an in-game APL
+overlay.
 
 Four decisions depart from the original design brief — the bridge, the desktop
 shell, the WASM entry point and the addon's snapshot timing. Each has an ADR
