@@ -32,6 +32,17 @@ const report = {
             actual_amount: { mean: 150_000_000 },
             portion_amount: 0.4,
           },
+          // Deals damage only through child spells, so actual_amount is absent
+          // and the real total lives in compound_amount. This is the shape that
+          // made the breakdown read 37% of the player's DPS.
+          {
+            name: 'frozen_orb',
+            num_executes: { mean: 5 },
+            compound_amount: 60_000_000,
+            children: [
+              { name: 'frozen_orb_bolt', num_executes: { mean: 120 }, actual_amount: { mean: 60_000_000 } },
+            ],
+          },
           // No damage and no casts: a talent simc reports but never used.
           { name: 'unused_spell', num_executes: { mean: 0 }, actual_amount: { mean: 0 } },
         ],
@@ -66,8 +77,31 @@ describe('parseReport', () => {
   it('sorts abilities by contribution', () => {
     assert.deepEqual(
       result.abilities.map((a) => a.name),
-      ['ice_lance', 'frostbolt'],
+      ['ice_lance', 'frostbolt', 'frozen_orb'],
     );
+  });
+
+  it('counts abilities that deal damage only through child spells', () => {
+    // Reading actual_amount would score this 0 and drop it off the chart, which
+    // is exactly what happened to Flurry and Ice Lance on a real Frost profile.
+    const orb = result.abilities.find((a) => a.name === 'frozen_orb')!;
+    assert.equal(orb.dps, 60_000_000 / 300);
+  });
+
+  it('never double-counts a child inside its parent total', () => {
+    assert.ok(!result.abilities.some((a) => a.name === 'frozen_orb_bolt'));
+  });
+
+  it('shares account for the whole breakdown', () => {
+    const total = result.abilities.reduce((sum, a) => sum + a.share, 0);
+    assert.ok(Math.abs(total - 1) < 1e-9, 'shares summed to ' + total);
+  });
+
+  it('derives share from the amount, not the absent portion_amount', () => {
+    // frozen_orb has no portion_amount at all; ice_lance's (0.4) disagrees with
+    // its true 150M/300M share, and the true value is the one to show.
+    const iceLance = result.abilities.find((a) => a.name === 'ice_lance')!;
+    assert.equal(iceLance.share, 150_000_000 / 300_000_000);
   });
 
   it('drops abilities with no casts and no damage', () => {

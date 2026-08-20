@@ -8,6 +8,7 @@ import express from 'express';
 
 import { config } from './config.js';
 import { engineStatuses, refreshEngineStatuses, startEngineProbing, stopEngineProbing } from './engines/index.js';
+import { parseReport } from './engines/simcReport.js';
 import { events } from './events.js';
 import { queue } from './queue.js';
 import { profilesRouter } from './routes/profiles.js';
@@ -156,6 +157,9 @@ export interface RunningServer {
 export async function startServer(options: { port?: number } = {}): Promise<RunningServer> {
   const stranded = store.reconcileOnBoot();
   if (stranded) console.warn('[store] marked ' + stranded + ' interrupted run(s) as errored');
+
+  const repaired = store.repairAbilityBreakdowns(parseReport);
+  if (repaired) console.log('[store] rebuilt ability breakdowns for ' + repaired + ' run(s)');
 
   startEngineProbing();
 

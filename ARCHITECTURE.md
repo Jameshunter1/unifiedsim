@@ -182,6 +182,16 @@ install works whether or not the native binary is permitted.
 Report parsing and progress scraping live in `engines/simcReport.ts`, shared by
 both simc-backed engines rather than duplicated.
 
+**The ability breakdown covered 37% of the player's damage.** Fixed, and worth
+recording alongside the addon bug below because it failed the same way: every
+individual number was real and the chart looked entirely reasonable. simc's
+stats tree is recursive, and abilities dealing damage through child spells
+report nothing in `actual_amount`. The chart omitted the largest damage source
+outright and ranked a mid-tier ability first. Only adding the shares up and
+comparing them to the player's own DPS revealed it. Shares now sum to 1 by
+construction, with a test on the invariant, and stored results are repaired on
+boot. See [ADR-0015](docs/adr/0015-ability-breakdown-uses-compound-amount.md).
+
 **The addon's logout snapshot destroyed every export.** Now fixed, and worth
 recording because the failure was invisible from the code alone. The addon
 snapshotted on `PLAYER_LOGOUT`, but the client has already torn down player

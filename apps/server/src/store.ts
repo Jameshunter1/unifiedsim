@@ -213,6 +213,43 @@ class Store {
     if (touched) this.persist();
     return touched;
   }
+
+  /**
+   * Re-derives stored ability breakdowns from their saved reports.
+   *
+   * Breakdowns written before the `compound_amount` fix summed to roughly a
+   * third of the player's damage and ranked abilities wrongly, because damage
+   * dealt through child spells was read as zero. The DPS figures were always
+   * correct, so only the breakdown is rebuilt.
+   *
+   * Detected by the symptom rather than a version flag: shares that do not add
+   * up. Re-running is harmless, since a correct breakdown sums to 1 and is
+   * skipped.
+   */
+  repairAbilityBreakdowns(reparse: (json: string) => { abilities: SimResult['abilities'] }): number {
+    let repaired = 0;
+
+    for (const run of this.data.runs) {
+      const abilities = run.result?.abilities;
+      if (!run.result || !run.reportPath || !abilities?.length) continue;
+
+      const shareTotal = abilities.reduce((sum, a) => sum + (a.share ?? 0), 0);
+      if (shareTotal > 0.95) continue;
+
+      const file = path.resolve(config.dataDir, run.reportPath);
+      if (!file.startsWith(path.resolve(config.dataDir) + path.sep) || !existsSync(file)) continue;
+
+      try {
+        run.result.abilities = reparse(readFileSync(file, 'utf8')).abilities;
+        repaired++;
+      } catch {
+        // A missing or unreadable report just leaves the old breakdown alone.
+      }
+    }
+
+    if (repaired) this.persist();
+    return repaired;
+  }
 }
 
 export const store = new Store();

@@ -59,6 +59,13 @@ rather than routing around it.
 **Serialiser changes must keep the round trip byte-identical.** There is a test.
 See [ADR-0009](docs/adr/0009-item-names-in-comments-only.md) for why.
 
+**Ability shares must sum to 1.** simc's stats tree is recursive, and abilities
+that damage through child spells report nothing in `actual_amount`. Reading the
+wrong field once made the chart cover 37% of the player's damage while looking
+entirely plausible — see
+[ADR-0015](docs/adr/0015-ability-breakdown-uses-compound-amount.md). A test
+asserts the invariant; do not weaken it.
+
 ## Writing an ADR
 
 Add one when a decision is expensive to reverse, contradicts the original

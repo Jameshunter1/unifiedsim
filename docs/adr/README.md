@@ -24,6 +24,7 @@ and links here for *why*.
 | [0012](0012-addon-snapshot-quality-scoring.md) | Snapshots are scored; a worse one never wins | Accepted |
 | [0013](0013-unsigned-packaging-and-distribution.md) | Ship from source; packaged builds are unsigned | Accepted |
 | [0014](0014-serial-sim-execution-by-default.md) | Run one simulation at a time by default | Accepted |
+| [0015](0015-ability-breakdown-uses-compound-amount.md) | Ability contribution reads `compound_amount` | Accepted |
 
 ## Departures from the original blueprint
 

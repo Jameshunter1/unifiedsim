@@ -430,8 +430,14 @@ export function AbilityChart({ abilities }: { abilities: AbilityBreakdown[] }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [tip, setTip] = useState<TooltipState | null>(null);
 
-  const rows = abilities.filter((a) => a.dps > 0).slice(0, 12);
+  const contributing = abilities.filter((a) => a.dps > 0);
+  const rows = contributing.slice(0, 12);
   if (!rows.length) return <div className="empty">No ability breakdown in this report.</div>;
+
+  // Say so when the list is cut. A truncated chart with no note reads as the
+  // complete picture.
+  const hidden = contributing.length - rows.length;
+  const hiddenShare = contributing.slice(12).reduce((sum, a) => sum + a.share, 0);
 
   const labelWidth = Math.min(220, Math.max(120, width * 0.32));
   const valueWidth = 84;
@@ -487,6 +493,12 @@ export function AbilityChart({ abilities }: { abilities: AbilityBreakdown[] }) {
           );
         })}
       </svg>
+      {hidden > 0 && (
+        <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+          + {hidden} more {hidden === 1 ? 'ability' : 'abilities'} making up{' '}
+          {fmt(hiddenShare * 100, 1)}% of damage
+        </div>
+      )}
       <Tooltip state={tip} />
     </div>
   );

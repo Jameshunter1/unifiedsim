@@ -39,37 +39,70 @@ export interface SimcJsonReport {
         fight_length?: { mean?: number };
       };
       scale_factors?: Record<string, number>;
-      stats?: Array<{
-        name?: string;
-        num_executes?: { mean?: number };
-        actual_amount?: { mean?: number };
-        portion_amount?: number;
-        total_intervals?: { mean?: number };
-        crit_pct?: number;
-        uptime?: { mean?: number };
-      }>;
+      stats?: SimcStat[];
     }>;
   };
 }
 
+/**
+ * One entry in a player's `stats` array.
+ *
+ * The shape is recursive: an ability that damages through a secondary spell
+ * (Frozen Orb through its bolts, Flurry through its impacts) records nothing in
+ * `actual_amount` and carries the real total in `compound_amount`, with the
+ * breakdown under `children`.
+ */
+interface SimcStat {
+  name?: string;
+  type?: string;
+  num_executes?: { mean?: number };
+  /** Direct amount only. Absent on abilities that deal damage via children. */
+  actual_amount?: { mean?: number };
+  /** This ability's total, including every child. */
+  compound_amount?: number;
+  portion_amount?: number;
+  crit_pct?: number;
+  uptime?: { mean?: number };
+  children?: SimcStat[];
+}
+
+/**
+ * Per-ability contribution.
+ *
+ * Reads `compound_amount`, not `actual_amount`. This matters more than it
+ * sounds: on a Frost Mage profile, summing `actual_amount` accounts for only
+ * 37% of the player's DPS and ranks Ice Lance fifth at 4.6%, while Flurry
+ * disappears entirely at 0. Both deal their damage through child spells.
+ * Using `compound_amount` reaches 99.8% of total DPS and puts Ice Lance first
+ * at 32.7% with Flurry second at 18% -- a different chart, and the correct one.
+ *
+ * `portion_amount` is likewise unusable as the share: it is absent on the parent
+ * entries, so shares are computed here against the displayed total instead.
+ */
 function toAbilities(report: SimcJsonReport, fightLength: number): AbilityBreakdown[] {
   const stats = report.sim?.players?.[0]?.stats ?? [];
-  const rows: AbilityBreakdown[] = [];
 
-  for (const stat of stats) {
-    const amount = stat.actual_amount?.mean ?? 0;
+  const amountOf = (stat: SimcStat): number =>
+    stat.compound_amount ?? stat.actual_amount?.mean ?? 0;
+
+  // Only the top level: a child's amount is already inside its parent's
+  // compound total, so including both would double-count.
+  const contributing = stats.filter((stat) => amountOf(stat) > 0);
+  const total = contributing.reduce((sum, stat) => sum + amountOf(stat), 0);
+
+  const rows: AbilityBreakdown[] = contributing.map((stat) => {
+    const amount = amountOf(stat);
     const executes = stat.num_executes?.mean ?? 0;
-    if (!amount && !executes) continue;
-    rows.push({
+    return {
       name: stat.name ?? 'unknown',
-      share: stat.portion_amount ?? 0,
+      share: total > 0 ? amount / total : 0,
       dps: fightLength > 0 ? amount / fightLength : 0,
       executes,
       amountPerExecute: executes > 0 ? amount / executes : 0,
       crit: stat.crit_pct,
       uptime: stat.uptime?.mean,
-    });
-  }
+    };
+  });
 
   return rows.sort((a, b) => b.dps - a.dps);
 }
