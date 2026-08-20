@@ -1,272 +1,120 @@
 # UnifiedSim
 
 [![CI](https://github.com/Jameshunter1/unifiedsim/actions/workflows/ci.yml/badge.svg)](https://github.com/Jameshunter1/unifiedsim/actions/workflows/ci.yml)
+[![Release](https://github.com/Jameshunter1/unifiedsim/actions/workflows/release.yml/badge.svg)](https://github.com/Jameshunter1/unifiedsim/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A local-first World of Warcraft simulation runner: import a character, sim gear
-and talent variations against SimulationCraft, and track DPS over time.
+A local-first desktop app that answers the question World of Warcraft players
+actually have — *which gear and talents should I use?* — by running real
+[SimulationCraft](https://github.com/simulationcraft/simc) simulations on your
+own machine. No cloud queue, no account, no waiting.
 
-Built around the tri-tier design in [ARCHITECTURE.md](ARCHITECTURE.md) — in-game
-addon, local bridge, pluggable sim engine. What runs today is the local spine;
-the WebAssembly and distributed tiers are scaffolded behind the same interface
-and report themselves unavailable until built.
+![UnifiedSim comparing talent loadouts against the equipped baseline, with a per-ability damage breakdown](docs/images/unifiedsim.png)
 
-```
-                        ┌──────────── Electron desktop app ────────────┐
-WoW client ──/usim sync──▶ SavedVariables.lua                          │
-                        │         │  fs.watch (ReadDirectoryChangesW)  │
-                        │         ▼                                    │
-                        │  Node server ──▶ job queue ──▶ SimEngine     │
-                        │         │                  ├── local-simc  ✅ │
-                        │  SSE    │                  ├── docker-simc ✅ │
-                        │         ▼                  ├── wasm     ▫    │
-                        │  React UI (charts)         └── cloud    ▫    │
-                        └──────────────────────────────────────────────┘
-```
+## What it does
 
-The server runs *inside* the desktop app's main process — one process, no port
-handshake, no orphaned server if the window dies, and native status (taskbar
-progress, tray, notifications) that keeps updating with the window closed.
+- **One-click gear comparisons** — each equipment slot lists your bag
+  alternates with real stats; one button sims them all against what you're
+  wearing. The equipped set is always the baseline, so every percentage means
+  something. (On the reference character this surfaced a 263 item-level trinket
+  beating the equipped 289 by +3.97% — the case ranking by item level gets wrong.)
+- **Talent loadout ranking** — every saved loadout simmed and ranked, with the
+  simulation's own error bars.
+- **Automatic character import** — a bundled in-game addon writes your
+  character on `/usim sync`; a file watcher imports it in under a second.
+  Pasting a `/simc` export works too.
+- **Item tooltips from the source of truth** — stats come from simc itself,
+  bonus IDs resolved with the same client data it sims with. No item database,
+  no API key, works offline.
+- **A real desktop app** — Electron shell hosting the server in-process:
+  taskbar progress, tray, and completion notifications keep working with the
+  window closed. The UI is a plain web page and also runs in a browser.
 
-![UnifiedSim comparing four talent loadouts, with the per-ability damage breakdown for the selected run](docs/images/unifiedsim.png)
-
-## Setup
+## Quick start
 
 ```bash
 npm install
-npm run simc:fetch      # downloads SimulationCraft into vendor/ -- see the note below
+npm run simc:fetch      # one-time engine download (see docs/setup.md for caveats)
 npm run desktop         # builds everything and opens the app
 ```
 
-That is the whole thing: no terminal to keep open, no browser tab. Paste a
-`/simc` export or use **File → Import profile from file…** and hit Run.
+Requires Node 22+. Details, the in-game addon, and every configuration knob:
+[docs/setup.md](docs/setup.md).
 
-Prefer a browser? `npm run dev` still serves the UI on <http://127.0.0.1:5273>
-with the API on `:8730`. The renderer is a plain web page with no Electron
-bridge, so both paths run identical code.
+## How it works
 
-## Desktop app
+```
+WoW client ──/usim sync──▶ SavedVariables.lua
+                                │  fs.watch
+                                ▼
+              Electron main process ─ hosts ─ Node server
+                                │                 │
+                                │        job queue ▶ SimEngine
+                                │                 │   ├─ native simc
+                                │   SSE           │   ├─ simc in Docker
+                                ▼                 │   └─ wasm / distributed (planned)
+              React UI (ranked comparisons, ability breakdowns, history)
+```
 
-| | |
+Every simulation backend implements one `SimEngine` interface; availability is
+probed by *executing* each engine, not by checking a file exists, and the app
+falls back from native binary to container automatically when the OS refuses
+unsigned executables. The full design — and fifteen recorded decisions,
+including where this build deliberately departs from its original blueprint —
+lives in [ARCHITECTURE.md](ARCHITECTURE.md) and [docs/adr/](docs/adr/README.md).
+
+## CI/CD
+
+- **CI** — build, typecheck, and 72 unit tests on Linux + Windows across Node
+  22/24; Lua syntax checking for the in-game addon; a production-dependency
+  audit gate (`npm audit --omit=dev --audit-level=high`).
+- **Releases** — tagging `vX.Y.Z` packages installers for Windows (NSIS +
+  portable), macOS (dmg) and Linux (AppImage), generates checksums, and
+  publishes a GitHub Release. Platform legs are independent, so one failure
+  never blocks the others. [docs/packaging.md](docs/packaging.md).
+- **Dependabot** — grouped weekly updates; Electron majors are the reason
+  (only the latest three receive security patches).
+
+## Development
+
+```bash
+npm run dev         # Vite UI on :5273 + API on :8730, with HMR
+npm test            # 72 unit tests (parser + server)
+npm run typecheck   # all workspaces, in dependency order
+```
+
+A 49-check end-to-end API suite runs against the live app during development;
+the parser round-trips a real addon export byte-for-byte, and the test fixture
+is a real character.
+
+| Path | |
 |---|---|
-| **Tray** | Live queue state; closing the window while sims run hides to the tray instead of killing the batch |
-| **Taskbar** | Progress bar tracks the running batch; the button flashes when it finishes |
-| **Notifications** | Batch completion names the winning variant and its DPS |
-| **File** | Import a profile from a file or the clipboard; open the data folder |
-| **Tools** | Download SimulationCraft, install the WoW addon, pick the SavedVariables file, re-check engines |
-
-State lives in `data/` for a checkout and in the OS user-data directory for an
-installed build, so a dev session and an installed copy never share a store.
-
-### Packaging
-
-```bash
-npm run desktop:pack    # unpacked app in apps/desktop/release/win-unpacked
-npm run desktop:dist    # NSIS installer + portable exe
-```
-
-Two things about packaging on Windows, both learned the hard way:
-
-- **Builds are unsigned, and Smart App Control may refuse to launch them.**
-  Reputation is evaluated per binary, so this is not consistent — of two builds
-  made minutes apart here, one launched and the next was blocked outright.
-  Running from a checkout via `npm run desktop` is unaffected, because that uses
-  the widely distributed `electron.exe`. Fixing it properly means code signing.
-- **The build needs a pre-seeded signing cache.** electron-builder downloads a
-  `winCodeSign` bundle containing macOS `.dylib` symlinks, and creating symlinks
-  on Windows requires Developer Mode or an elevated shell. Without it the
-  extraction fails and the build aborts. Either enable Developer Mode
-  (Settings → System → For developers), or extract the archive once yourself
-  skipping the darwin tree:
-
-  ```bash
-  7za x <cache>/winCodeSign/<n>.7z -o<cache>/winCodeSign/winCodeSign-2.6.0 -x'!darwin'
-  ```
-
-`npm run desktop:pack` also stages the workspace packages into
-`apps/desktop/node_modules` and removes them afterwards — see
-[`scripts/pack-desktop.mjs`](scripts/pack-desktop.mjs) for why that is necessary.
-
-### About `npm run simc:fetch`
-
-It downloads a ~120 MB executable from `downloads.simulationcraft.org`. Two
-things worth knowing before you run it:
-
-- Upstream's TLS certificate does not match the host, so the fetch uses plain
-  **HTTP**.
-- Upstream publishes **no checksums or signatures**.
-
-The script prints both facts, asks for confirmation, and records the sha256 of
-what it received in `vendor/simc/PROVENANCE.json` so a later fetch can tell you
-if the artifact behind a filename changed. If you would rather not, install
-SimulationCraft yourself and point `SIMC_PATH` at it in `.env` — the server also
-probes the usual install locations automatically.
-
-### If Windows refuses to run simc
-
-SimulationCraft nightlies are **unsigned**. With **Smart App Control** enforced,
-Windows blocks them outright, and the download succeeds while every sim fails.
-
-Check whether that is your situation:
-
-```powershell
-Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\CI\Policy' -Name VerifiedAndReputablePolicyState
-# 0 = off   1 = enforced   2 = evaluation
-```
-
-The server detects this at startup and says so instead of advertising a working
-engine, so you will see it in the UI rather than as a mystery failure.
-
-Smart App Control has **no per-app exception list**, and turning it off is
-**permanent** — it cannot be re-enabled without reinstalling Windows. So the
-supported route is a container:
-
-```bash
-npm run simc:docker      # builds simc from source on Linux, ~10-20 min once
-```
-
-Linux simc is not subject to the policy. The server prefers a native binary
-when one runs and falls back to the container automatically, so nothing else
-changes — same UI, same API, same reports.
-
-Other options, if you would rather not use Docker: install a **signed**
-SimulationCraft build (the policy allows those), build simc inside WSL and
-point `SIMC_PATH` at it, or disable Smart App Control — only if you understand
-that is one-way.
-
-## Engines
-
-The server registers several backends behind one `SimEngine` interface and uses
-the first that actually works.
-
-| Engine | State | Notes |
-|---|---|---|
-| `local-simc` | works when the OS permits | Native binary. Fastest — no mount, no container start |
-| `docker-simc` | works once the image is built | `npm run simc:docker`. Immune to unsigned-binary blocking |
-| `wasm` | scaffold | Browser-side. See `engine-wasm/README.md` |
-| `cloud` | interface slot | For searches too large for one machine |
-
-Availability is probed by *executing* the engine, not by checking a file
-exists — a present-but-unrunnable binary would otherwise advertise itself as
-working and fail on the first sim. The header shows each tier's real state and
-the reason when one is unavailable.
-
-## The in-game addon (optional)
-
-```bash
-npm run addon:link      # junctions addon/UnifiedSim into your AddOns folder
-```
-
-Then in game: enable **UnifiedSim**, and run `/usim sync`.
-
-| Command | What it does |
-|---|---|
-| `/usim sync` | Snapshot, then reload the UI so it reaches disk immediately |
-| `/usim save` | Snapshot only; written out at your next reload or logout |
-| `/usim copy` | Show the profile text to copy by hand |
-
-`/usim sync` reloads on purpose. WoW buffers SavedVariables in memory and only
-serialises them on a graceful logout, a character switch, or `ReloadUI()` — so
-without the reload your snapshot sits in memory and the bridge never sees it.
-The server picks the file up within about half a second of the flush.
-
-The addon also snapshots automatically on login, on logout, and a couple of
-seconds after gear or talent changes settle — but those only reach disk on the
-next flush.
-
-A snapshot is scored on how complete it is (spec, talents, item count) and a
-worse one never replaces a better one. That guard matters at logout: the client
-has already torn player state down by then, so the export would come out with
-no spec, no talents and no gear — and since the logout snapshot is the last
-write before the file is serialised, without the guard *every* exported profile
-would be the empty one. The server independently refuses to auto-import an
-export with no equipped gear, since it could not be simulated anyway.
-
-## Configuration
-
-Copy `.env.example` to `.env`. Everything has a working default.
-
-| Variable | Default | Notes |
-|---|---|---|
-| `SIMC_PATH` | auto-detected | Explicit path to the simc executable |
-| `SIMC_ITERATIONS` | `10000` | Ceiling; `target_error` usually stops earlier |
-| `SIMC_TARGET_ERROR` | `0.2` | Convergence target, in percent |
-| `SIMC_FIGHT_STYLE` | `Patchwerk` | |
-| `SIMC_THREADS` | cores − 1 | Threads per sim |
-| `SIM_CONCURRENCY` | `1` | Parallel jobs — see below |
-| `WOW_SAVEDVARS` | auto-detected | Full path to `UnifiedSim.lua` |
-| `PORT` | `8730` | |
-
-`SIM_CONCURRENCY` defaults to 1 deliberately. SimC saturates every core it is
-given, so running two jobs at once mostly makes both slower. Raise it only if
-you also lower `SIMC_THREADS`.
-
-## What the batch runner gives you
-
-Selecting variants builds one sim per variant and queues them together:
-
-- **Talent loadouts** — every loadout in your export, including the saved ones
-  the addon writes out commented. Answers "is my M+ build actually better on
-  this fight?"
-- **Gear swaps** — every item in your bags that could go in an equipped slot.
-  Rings and trinkets are tried in both positions, because the export only ever
-  lists an alternate against the first one.
-
-Results rank by DPS with the simulation's own error bars, and each variant shows
-its delta against the baseline. Item level is *not* used to filter candidates: a
-lower-ilvl trinket with the right effect routinely beats a higher-ilvl one.
-
-The UI also reports the size of the exhaustive search the batch samples from.
-For the profile this was built against that is 414,720 permutations versus 30
-single-change variants — which is the honest reason a "Top Gear" feature needs
-more than one machine, and why the engine interface has a distributed slot.
+| `packages/simc-profile` | Parser/serialiser for the SimC addon export format |
+| `apps/server` | Express API, job queue, engine interface, SavedVariables watcher |
+| `apps/web` | React UI — hand-rolled SVG charts, no chart library |
+| `apps/desktop` | Electron shell: tray, menus, native install flows |
+| `addon/UnifiedSim` | The in-game Lua addon |
+| `docker/simc` | Linux simc image, built from source |
+| `engine-wasm` | Browser engine scaffold (Emscripten entry point) |
 
 ## Documentation
 
 | | |
 |---|---|
-| [ARCHITECTURE.md](ARCHITECTURE.md) | How the system fits together today, and what is still unknown |
-| [docs/adr/](docs/adr/README.md) | Why it is built this way — 15 decision records |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, the rules a PR is held to, and how to work on the addon |
-| [engine-wasm/README.md](engine-wasm/README.md) | What porting simc to WebAssembly actually involves |
-| [NOTICE.md](NOTICE.md) | Third-party notices — simc is GPL-3.0 and is run, not bundled |
-| [SECURITY.md](SECURITY.md) | What is in scope, and the two alarming-looking things that are intentional |
+| [docs/setup.md](docs/setup.md) | Engines, the addon, configuration |
+| [docs/packaging.md](docs/packaging.md) | Local packaging and the release pipeline |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | How the system fits together, and what's still open |
+| [docs/adr/](docs/adr/README.md) | Why it's built this way — 15 decision records |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Setup and the rules a PR is held to |
+| [SECURITY.md](SECURITY.md) | Scope, and the intentional behaviours that look alarming |
+| [NOTICE.md](NOTICE.md) | SimulationCraft is GPL-3.0 and is run, not bundled |
 
 Planned work is tracked in
-[milestones](https://github.com/Jameshunter1/unifiedsim/milestones), roughly:
-trustworthy distribution (code signing), verifying the addon in game, the
-upgrade planner, a WebAssembly engine, distributed search, and an in-game APL
-overlay.
+[milestones](https://github.com/Jameshunter1/unifiedsim/milestones): code
+signing, in-game addon verification, an upgrade planner, a WebAssembly engine,
+distributed search, and an in-game rotation overlay.
 
-Four decisions depart from the original design brief — the bridge, the desktop
-shell, the WASM entry point and the addon's snapshot timing. Each has an ADR
-explaining why, so they are not mistaken for oversights and quietly reverted.
+## License
 
-## Layout
-
-| Path | |
-|---|---|
-| `packages/simc-profile` | Parser / serialiser for the SimC addon export format (40 tests) |
-| `apps/server` | Express API, job queue, engine interface, SavedVariables watcher (25 tests) |
-| `apps/web` | React UI (also runs standalone in a browser) |
-| `apps/desktop` | Electron shell: hosts the server, tray, menus, native install flows |
-| `addon/UnifiedSim` | The in-game addon |
-| `docker/simc` | Linux simc image, built from source |
-| `engine-wasm` | Browser engine scaffold — see its README |
-| `fixtures` | Real export used by the tests |
-
-## Development
-
-```bash
-npm test            # 65 unit tests across the parser and server
-npm run typecheck   # all workspaces, in dependency order
-npm run build       # all workspaces, in dependency order
-```
-
-Workspaces build in an explicit dependency order rather than with
-`--workspaces`, which runs them arbitrarily and let the desktop app type-check
-before the server it imports types from had emitted anything.
-
-The server needs `@usim/simc-profile` built at least once
-(`npm run build --workspace=@usim/simc-profile`); `npm run build` does that
-first.
+[MIT](LICENSE). World of Warcraft is a trademark of Blizzard Entertainment;
+this is an unofficial, unaffiliated tool.

@@ -14,7 +14,7 @@ is still unknown.
 | Bridge | SavedVariables watcher | **Built and verified** end to end. |
 | Bridge | Tauri/Rust agent | **Deliberately skipped** — see below. |
 | Shell | Electron desktop app | **Built.** Hosts the server in-process. |
-| Engine | Local SimulationCraft | **Built.** Blocked by OS policy on this machine — see below. |
+| Engine | Local SimulationCraft | **Built and working.** One earlier build was refused by OS policy — see below. |
 | Engine | SimulationCraft in Docker | **Built.** The working engine here. |
 | Engine | Browser WebAssembly | Scaffold only — `engine-wasm/`. |
 | Engine | Distributed workers | Interface slot only. |
@@ -162,10 +162,12 @@ guessing. Resolving it needs two exports from the same character with one known
 slot changed. Until then an upgrade planner built on this field would be
 silently wrong, which is why one is not built.
 
-**The local engine is blocked on this machine.** Smart App Control is enforced
-(`VerifiedAndReputablePolicyState = 1`) and SimulationCraft nightlies are
-unsigned, so Windows refuses to execute `vendor/simc/simc.exe`. The binary
-downloaded and extracted correctly; it simply cannot run.
+**Smart App Control refuses unsigned binaries non-deterministically.** It is
+enforced here (`VerifiedAndReputablePolicyState = 1`) and SimulationCraft
+nightlies are unsigned. The first downloaded `simc.exe` extracted correctly and
+would not execute at all; a later download of the same version runs fine —
+reputation is evaluated per binary hash, so the verdict is not stable across
+builds. The same pattern hit the app's own packaged builds.
 
 This is why `locateSimc()` probes by *executing* the binary rather than by
 checking that the file exists. A file-existence check would advertise a working
