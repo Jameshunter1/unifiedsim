@@ -457,6 +457,165 @@ tbody tr:last-child td {
   flex: none;
 }
 
+/* --- tooltips ---------------------------------------------------------- */
+.tt-wrap { display: inline-flex; align-items: center; }
+
+.tt {
+  position: fixed;
+  z-index: 60;
+  max-width: 300px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+
+  /*
+    A tooltip is a DOM child of whatever it annotates, so it inherits that
+    element's text styling even though it renders elsewhere on screen. Anchored
+    to a form label -- which is uppercased and letter-spaced -- the help text
+    came out shouting. Reset the inheritable text properties explicitly.
+  */
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  font-style: normal;
+  text-align: left;
+  font-family: var(--font);
+}
+
+.tt strong { display: block; margin-bottom: 3px; }
+.tt .tt-row { display: flex; justify-content: space-between; gap: 14px; color: var(--text-muted); }
+.tt .tt-row span:last-child { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.tt .tt-note { margin-top: 6px; color: var(--text-muted); }
+
+.hint {
+  width: 15px; height: 15px; padding: 0; flex: none;
+  border-radius: 50%; border: 1px solid var(--border);
+  background: transparent; color: var(--text-muted);
+  font-size: 10px; font-style: italic; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+.hint:hover, .hint:focus-visible { color: var(--series-1); border-color: var(--series-1); }
+
+.field label { display: flex; align-items: center; gap: 5px; }
+
+/* Icons sit optically with their label rather than on the text baseline. */
+.icon { flex: none; vertical-align: -2px; }
+
+.slot-name .icon { color: var(--text-muted); }
+
+/* --- interactive affordances ------------------------------------------- */
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+th.sortable:hover { color: var(--text-primary); }
+
+th.sortable .icon { vertical-align: -3px; margin-left: 2px; }
+
+.item-link {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--series-1); text-decoration: none; font-size: 12px;
+  pointer-events: auto;
+}
+
+.item-link:hover { text-decoration: underline; }
+
+*:focus-visible {
+  outline: 2px solid var(--series-1);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* --- gear comparison picker ------------------------------------------- */
+.gear { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; padding-right: 4px; }
+
+/*
+  Flex children shrink by default. Inside a max-height column that meant every
+  slot was squashed to a few pixels to make the list "fit" instead of scrolling.
+*/
+.gear > * { flex: 0 0 auto; }
+
+.gear-filter-wrap {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; gap: 7px;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0 9px;
+}
+
+.gear-filter-wrap .icon { color: var(--text-muted); flex: none; }
+
+.gear-filter {
+  font-size: 13px; padding: 6px 0; border: none; background: none; border-radius: 0;
+}
+
+.gear-filter:focus-visible { outline: none; }
+.gear-filter-wrap:focus-within { border-color: var(--series-1); }
+
+.slot-run { display: inline-flex; align-items: center; gap: 5px; }
+
+.slot { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+
+.slot-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 9px; background: var(--page); border-bottom: 1px solid var(--border);
+}
+
+.slot-id { display: flex; flex-direction: column; min-width: 0; flex: 1; line-height: 1.3; }
+
+.slot-name {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted);
+}
+
+.slot-id .muted {
+  font-size: 12.5px; color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.slot-run { flex: none; font-size: 12px; padding: 4px 10px; }
+
+/* Grid so item level and delta line up down the whole list, not per row. */
+.gear-row {
+  display: grid; grid-template-columns: 16px 1fr 42px 34px;
+  align-items: center; gap: 8px;
+  padding: 4px 9px; font-size: 13px; cursor: pointer;
+}
+
+/*
+  The global `input` rule sets width:100%, which is right for the text fields
+  and wrong for a checkbox in a grid cell -- it stretched the box and collapsed
+  every other column in the row.
+*/
+.gear-row input[type='checkbox'] {
+  width: auto;
+  margin: 0;
+  accent-color: var(--series-1);
+}
+
+.gear-row:hover { background: var(--page); }
+
+.gear-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.gear-ilvl, .gear-delta {
+  text-align: right; font-variant-numeric: tabular-nums; font-size: 12px;
+}
+
+.gear-ilvl { color: var(--text-secondary); }
+.gear-delta.up { color: var(--delta-good); }
+.gear-delta.down { color: var(--status-critical); }
+.gear-delta.flat { color: var(--text-muted); }
+
 .tabs {
   display: flex;
   gap: 2px;

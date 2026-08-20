@@ -57,6 +57,7 @@ function sanitizeVariants(input: unknown): ProfileVariant[] {
       extraOptions: Array.isArray(v.extraOptions)
         ? v.extraOptions.filter((o): o is string => typeof o === 'string')
         : undefined,
+      baseline: v.baseline === true,
     });
   }
   return out.length ? out : [{ label: 'baseline' }];
@@ -128,6 +129,7 @@ runsRouter.post('/', async (req, res) => {
       profileId: stored.id,
       batchId,
       variantLabel: variant.label,
+      isBaseline: variant.baseline === true,
       engine: engineId,
       options,
     });

@@ -3,6 +3,8 @@ import { Router } from 'express';
 import {
   bagSwapVariants,
   bagsBySlot,
+  equippedBaseline,
+  gearSwapsBySlot,
   parseProfile,
   permutationCount,
   serializeProfile,
@@ -153,6 +155,10 @@ profilesRouter.get('/:id/variants', (req, res) => {
   res.json({
     talents,
     gear,
+    /** The same swaps grouped by slot, which is how gear is actually chosen. */
+    gearBySlot: gearSwapsBySlot(parsed),
+    /** Every gear comparison needs this run to measure against. */
+    baseline: equippedBaseline(parsed),
     /** Single-change variants we can enumerate cheaply. */
     suggestedCount: talents.length + gear.length,
     /** Full cross-product, for deciding when a search needs more than one box. */

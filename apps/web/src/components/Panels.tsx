@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import { api, type Health, type Profile, type ProfileDetail, type Variant } from '../api.ts';
+import {
+  api,
+  type GearSwapVariant,
+  type Health,
+  type Profile,
+  type ProfileDetail,
+  type SlotGroup,
+  type Variant,
+} from '../api.ts';
+import { IconExternal, IconPlay, IconSearch, IconTrash, SlotIcon } from './Icons.tsx';
+import { Hint, Tooltip } from './Tooltip.tsx';
 
 /* ----------------------------------------------------------------- status */
 
@@ -205,16 +215,26 @@ export function ProfilePanel({
                   {profile.source} · {new Date(profile.createdAt).toLocaleString()}
                 </div>
               </button>
-              <button
-                className="danger-text"
-                title="Delete profile and its runs"
-                onClick={async () => {
-                  await api.deleteProfile(profile.id);
-                  onDeleted();
-                }}
+              <Tooltip
+                content={
+                  <>
+                    <strong>Delete this profile</strong>
+                    Also removes every simulation run recorded against it. The character in game is
+                    untouched.
+                  </>
+                }
               >
-                ✕
-              </button>
+                <button
+                  className="danger-text"
+                  aria-label={'Delete ' + profile.label}
+                  onClick={async () => {
+                    await api.deleteProfile(profile.id);
+                    onDeleted();
+                  }}
+                >
+                  <IconTrash size={13} className="icon" />
+                </button>
+              </Tooltip>
             </div>
           ))}
         </div>
@@ -345,10 +365,13 @@ export function LaunchPanel({
   onLaunched: (batchId: string) => void;
 }) {
   const [talentVariants, setTalentVariants] = useState<Variant[]>([]);
-  const [gearVariants, setGearVariants] = useState<Variant[]>([]);
+  const [gearVariants, setGearVariants] = useState<GearSwapVariant[]>([]);
+  const [gearBySlot, setGearBySlot] = useState<SlotGroup[]>([]);
+  const [baseline, setBaseline] = useState<Variant>({ label: 'Currently equipped', baseline: true });
   const [exhaustive, setExhaustive] = useState(0);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState<'talents' | 'gear'>('talents');
+  const [filter, setFilter] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -362,12 +385,15 @@ export function LaunchPanel({
 
   useEffect(() => {
     setPicked(new Set());
+    setFilter('');
     setError(null);
     api
       .variants(profileId)
       .then((v) => {
         setTalentVariants(v.talents);
         setGearVariants(v.gear);
+        setGearBySlot(v.gearBySlot);
+        setBaseline(v.baseline);
         setExhaustive(v.exhaustiveCount);
       })
       .catch((err) => setError((err as Error).message));
@@ -397,11 +423,25 @@ export function LaunchPanel({
 
   const engineReady = health?.engines.find((e) => e.id === 'local-simc')?.available ?? false;
 
-  const launch = async () => {
+  /**
+   * Queues a batch.
+   *
+   * Any batch containing a gear swap gets the equipped set added as its
+   * reference. A swap on its own produces one number with nothing to compare it
+   * to, which is not an answer to "is this item better".
+   */
+  const launchVariants = async (chosen: Variant[]) => {
     setBusy(true);
     setError(null);
     try {
-      const variants = selected.length ? selected : [{ label: 'baseline' }];
+      const needsReference =
+        chosen.some((v) => v.gear) && !chosen.some((v) => v.baseline);
+      const variants = chosen.length
+        ? needsReference
+          ? [baseline, ...chosen]
+          : chosen
+        : [{ ...baseline, label: 'baseline' }];
+
       const { batchId } = await api.launch({
         profileId,
         variants,
@@ -421,7 +461,41 @@ export function LaunchPanel({
     }
   };
 
+  const launch = () => launchVariants(selected);
+
+  /**
+   * Sims every alternate for one slot against what is worn there.
+   *
+   * Labels drop the slot and the displaced item, because every row in the
+   * comparison shares them -- what varies is the candidate, so that is the label.
+   */
+  const simSlot = (group: SlotGroup) => {
+    const withIlvl = (c: { name: string; itemLevel?: number }) =>
+      c.name + (c.itemLevel ? ' (' + c.itemLevel + ')' : '');
+
+    const reference: Variant = {
+      ...baseline,
+      label: group.equipped ? 'Equipped: ' + withIlvl(group.equipped) : 'Equipped: nothing',
+    };
+    const candidates = group.candidates.map((v) => ({ ...v, label: withIlvl(v.candidate) }));
+    return launchVariants([reference, ...candidates]);
+  };
+
   const list = tab === 'talents' ? talentVariants : gearVariants;
+
+  const needle = filter.trim().toLowerCase();
+  const visibleSlots = gearBySlot
+    .map((group) => ({
+      ...group,
+      candidates: needle
+        ? group.candidates.filter(
+            (c) =>
+              c.candidate.name.toLowerCase().includes(needle) ||
+              group.slot.toLowerCase().includes(needle),
+          )
+        : group.candidates,
+    }))
+    .filter((group) => group.candidates.length > 0);
 
   return (
     <div className="card">
@@ -444,17 +518,156 @@ export function LaunchPanel({
         </button>
       </div>
 
-      <div className="checklist">
-        {list.length === 0 && <div className="empty">Nothing to compare here.</div>}
-        {list.map((variant) => (
-          <label key={variant.label}>
-            <input type="checkbox" checked={picked.has(variant.label)} onChange={() => toggle(variant.label)} />
-            <span>{variant.label}</span>
-          </label>
-        ))}
-      </div>
+      {tab === 'talents' ? (
+        <div className="checklist">
+          {list.length === 0 && <div className="empty">Nothing to compare here.</div>}
+          {list.map((variant) => (
+            <label key={variant.label}>
+              <input
+                type="checkbox"
+                checked={picked.has(variant.label)}
+                onChange={() => toggle(variant.label)}
+              />
+              <span>{variant.label}</span>
+            </label>
+          ))}
+        </div>
+      ) : (
+        <div className="gear">
+          {gearBySlot.length === 0 && (
+            <div className="empty">
+              No bag alternates in this export. Run <code>/usim sync</code> with the items in your
+              bags.
+            </div>
+          )}
 
-      {list.length > 0 && (
+          {gearBySlot.length > 0 && (
+            <div className="gear-filter-wrap">
+              <IconSearch size={13} className="icon" />
+              <input
+                className="gear-filter"
+                type="search"
+                value={filter}
+                placeholder="Filter by item or slot…"
+                onChange={(e) => setFilter(e.target.value)}
+                aria-label="Filter gear alternates"
+              />
+            </div>
+          )}
+
+          {gearBySlot.length > 0 && visibleSlots.length === 0 && (
+            <div className="empty">Nothing matches “{filter}”.</div>
+          )}
+
+          {visibleSlots.map((group) => (
+            <section className="slot" key={group.slot}>
+              <header className="slot-head">
+                <div className="slot-id">
+                  <span className="slot-name">
+                    <SlotIcon slot={group.slot} size={13} className="icon" />
+                    {group.slot.replace('_', ' ')}
+                  </span>
+                  <span className="muted">
+                    {group.equipped ? group.equipped.name : 'empty'}
+                    {group.equipped?.itemLevel ? ' · ' + group.equipped.itemLevel : ''}
+                  </span>
+                </div>
+                <Tooltip
+                  content={
+                    <>
+                      <strong>Compare this slot</strong>
+                      Sims {group.candidates.length} alternate
+                      {group.candidates.length === 1 ? '' : 's'} against what you have equipped, and
+                      ranks them by DPS.
+                      <div className="tt-note">
+                        Your equipped item is always included, so the percentages mean something.
+                      </div>
+                    </>
+                  }
+                >
+                  <button
+                    className="primary slot-run"
+                    disabled={busy || !engineReady}
+                    onClick={() => simSlot(group)}
+                  >
+                    <IconPlay size={11} className="icon" />
+                    Compare {group.candidates.length + 1}
+                  </button>
+                </Tooltip>
+              </header>
+
+              {group.candidates.map((c) => (
+                <Tooltip
+                  key={c.label}
+                  placement="right"
+                  content={
+                    <>
+                      <strong>{c.candidate.name}</strong>
+                      <div className="tt-row">
+                        <span>Item level</span>
+                        <span>{c.candidate.itemLevel ?? 'unknown'}</span>
+                      </div>
+                      <div className="tt-row">
+                        <span>Replaces</span>
+                        <span>{c.replaces?.name ?? 'nothing'}</span>
+                      </div>
+                      {c.itemLevelDelta !== undefined && (
+                        <div className="tt-row">
+                          <span>Item level change</span>
+                          <span>
+                            {c.itemLevelDelta > 0 ? '+' : ''}
+                            {c.itemLevelDelta}
+                          </span>
+                        </div>
+                      )}
+                      <div className="tt-note">
+                        Item level is not DPS. Sim the slot to find out which actually wins.
+                      </div>
+                      <a
+                        className="item-link"
+                        href={'https://www.wowhead.com/item=' + c.candidate.id}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <IconExternal size={12} className="icon" />
+                        Open on Wowhead
+                      </a>
+                    </>
+                  }
+                >
+                <label className="gear-row">
+                  <input
+                    type="checkbox"
+                    checked={picked.has(c.label)}
+                    onChange={() => toggle(c.label)}
+                  />
+                  <span className="gear-name">{c.candidate.name}</span>
+                  <span className="gear-ilvl">{c.candidate.itemLevel ?? '—'}</span>
+                  <span
+                    className={
+                      'gear-delta ' +
+                      (c.itemLevelDelta === undefined || c.itemLevelDelta === 0
+                        ? 'flat'
+                        : c.itemLevelDelta > 0
+                          ? 'up'
+                          : 'down')
+                    }
+                  >
+                    {c.itemLevelDelta === undefined
+                      ? ''
+                      : c.itemLevelDelta === 0
+                        ? '='
+                        : (c.itemLevelDelta > 0 ? '+' : '') + c.itemLevelDelta}
+                  </span>
+                </label>
+                </Tooltip>
+              ))}
+            </section>
+          ))}
+        </div>
+      )}
+
+      {tab === 'talents' && list.length > 0 && (
         <div className="row" style={{ marginTop: 6 }}>
           <button
             onClick={() => setPicked((p) => new Set([...p, ...list.map((v) => v.label)]))}
@@ -480,7 +693,10 @@ export function LaunchPanel({
         }}
       >
         <div className="field">
-          <label htmlFor="fight-style">Fight style</label>
+          <label htmlFor="fight-style">
+            Fight style
+            <Hint content={<><strong>Fight style</strong>The encounter shape simc models. Patchwerk is a single target that never moves — the standard benchmark. DungeonSlice approximates a Mythic+ pull, mixing single target and packs.</>} />
+          </label>
           <select
             id="fight-style"
             value={options.fightStyle}
@@ -494,7 +710,10 @@ export function LaunchPanel({
           </select>
         </div>
         <div className="field">
-          <label htmlFor="targets">Targets</label>
+          <label htmlFor="targets">
+            Targets
+            <Hint content={<><strong>Targets</strong>How many enemies to fight at once. Raise it to see which build or item scales into cleave; leave it at 1 for a raid boss.</>} />
+          </label>
           <input
             id="targets"
             type="number"
@@ -505,7 +724,10 @@ export function LaunchPanel({
           />
         </div>
         <div className="field">
-          <label htmlFor="max-time">Fight length (s)</label>
+          <label htmlFor="max-time">
+            Fight length (s)
+            <Hint content={<><strong>Fight length</strong>Encounter duration in seconds. Cooldowns line up differently over 120s than 300s, so a long-cooldown trinket can win at one length and lose at another.</>} />
+          </label>
           <input
             id="max-time"
             type="number"
@@ -516,7 +738,10 @@ export function LaunchPanel({
           />
         </div>
         <div className="field">
-          <label htmlFor="target-error">Target error (%)</label>
+          <label htmlFor="target-error">
+            Target error (%)
+            <Hint content={<><strong>Target error</strong>How precise the answer needs to be, as a percentage of DPS. simc keeps iterating until it converges here, then stops. 0.2% is trustworthy for ranking items; 1% is fast and fine for a rough look.</>} />
+          </label>
           <input
             id="target-error"
             type="number"
@@ -528,7 +753,10 @@ export function LaunchPanel({
           />
         </div>
         <div className="field">
-          <label htmlFor="iterations">Max iterations</label>
+          <label htmlFor="iterations">
+            Max iterations
+            <Hint content={<><strong>Max iterations</strong>A ceiling, not a target. Convergence on target error almost always stops the run first — this only bounds how long a stubborn profile can take.</>} />
+          </label>
           <input
             id="iterations"
             type="number"

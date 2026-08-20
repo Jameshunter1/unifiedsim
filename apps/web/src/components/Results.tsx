@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { api, type SimRun } from '../api.ts';
+import { IconSort, IconStop } from './Icons.tsx';
+import { Tooltip } from './Tooltip.tsx';
 import { AbilityChart, DpsHistory, VariantComparison, fmt, useAutoScroll, type ComparisonRow } from './Charts.tsx';
 
 const STATUS_COLOR: Record<SimRun['status'], string> = {
@@ -51,25 +53,53 @@ export function BatchResults({
     return runs.filter((r) => r.batchId === id);
   }, [runs, batchId]);
 
+  const [sort, setSort] = useState<{ key: 'label' | 'dps' | 'error'; dir: 'asc' | 'desc' }>({
+    key: 'dps',
+    dir: 'desc',
+  });
+
   const done = batch.filter((r) => r.status === 'done' && r.result);
   const pending = batch.filter((r) => r.status === 'queued' || r.status === 'running');
   const failed = batch.filter((r) => r.status === 'error');
 
   const rows: ComparisonRow[] = useMemo(() => {
-    const isBaselineLabel = (label: string) => label === 'baseline' || label.includes('(equipped)');
+    // Runs created before the baseline flag existed only carry a label, so fall
+    // back to reading it for those.
+    const looksBaseline = (run: SimRun) =>
+      run.isBaseline ?? (run.variantLabel === 'baseline' || run.variantLabel.includes('(equipped)'));
     return done
       .map((run) => ({
         label: run.variantLabel,
         dps: run.result!.dps,
         error: run.result!.dpsError,
-        isBaseline: isBaselineLabel(run.variantLabel),
+        isBaseline: looksBaseline(run),
         runId: run.id,
       }))
       .sort((a, b) => b.dps - a.dps);
   }, [done]);
 
-  const baseline = rows.find((r) => r.isBaseline) ?? rows[rows.length - 1];
+  /**
+   * The reference, or nothing.
+   *
+   * Deliberately not falling back to another row: rows are sorted descending, so
+   * the old `rows[rows.length - 1]` fallback quietly used the *worst* result as
+   * the reference and reported every option as an improvement.
+   */
+  const baseline = rows.find((r) => r.isBaseline);
   const best = rows[0];
+
+  // The chart is always ranked by DPS; only the table follows the chosen sort.
+  const tableRows = useMemo(() => {
+    const dir = sort.dir === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) =>
+      sort.key === 'label' ? a.label.localeCompare(b.label) * dir : (a[sort.key] - b[sort.key]) * dir,
+    );
+  }, [rows, sort]);
+
+  const sortBy = (key: 'label' | 'dps' | 'error') =>
+    setSort((s) => ({ key, dir: s.key === key && s.dir === 'desc' ? 'asc' : 'desc' }));
+
+  const sortDir = (key: string) => (sort.key === key ? sort.dir : null);
 
   if (!batch.length) {
     return (
@@ -111,6 +141,13 @@ export function BatchResults({
 
       <VariantComparison rows={rows} onSelect={onSelectRun} selectedRunId={selectedRunId ?? undefined} />
 
+      {rows.length > 1 && !baseline && (
+        <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+          No reference run in this batch, so there is nothing to measure against. Comparing gear
+          from the Gear tab includes your equipped set automatically.
+        </div>
+      )}
+
       {/* Table view: the relief path for the sub-3:1 contrast warning, and the
           only place every number is readable without hovering. */}
       <details style={{ marginTop: 12 }} open={rows.length <= 6}>
@@ -121,16 +158,67 @@ export function BatchResults({
           <table>
             <thead>
               <tr>
-                <th>Variant</th>
-                <th className="num">DPS</th>
-                <th className="num">Error</th>
-                <th className="num">vs baseline</th>
-                <th className="num">Iterations</th>
+                <th
+                  className="sortable"
+                  onClick={() => sortBy('label')}
+                  aria-sort={sortDir('label') === 'asc' ? 'ascending' : sortDir('label') ? 'descending' : 'none'}
+                >
+                  Variant
+                  <IconSort size={12} className="icon" dir={sortDir('label')} />
+                </th>
+                <th
+                  className="num sortable"
+                  onClick={() => sortBy('dps')}
+                  aria-sort={sortDir('dps') === 'asc' ? 'ascending' : sortDir('dps') ? 'descending' : 'none'}
+                >
+                  DPS
+                  <IconSort size={12} className="icon" dir={sortDir('dps')} />
+                </th>
+                <th className="num sortable" onClick={() => sortBy('error')}>
+                  <Tooltip
+                    content={
+                      <>
+                        <strong>Error</strong>
+                        The simulation&rsquo;s own margin. Two results closer together than their
+                        error bars are a tie, not a ranking.
+                      </>
+                    }
+                  >
+                    <span>Error</span>
+                  </Tooltip>
+                  <IconSort size={12} className="icon" dir={sortDir('error')} />
+                </th>
+                <th className="num">
+                  <Tooltip
+                    content={
+                      <>
+                        <strong>vs baseline</strong>
+                        Percentage difference against the reference run &mdash; your equipped gear
+                        or active loadout.
+                      </>
+                    }
+                  >
+                    <span>vs baseline</span>
+                  </Tooltip>
+                </th>
+                <th className="num">
+                  <Tooltip
+                    content={
+                      <>
+                        <strong>Iterations</strong>
+                        How many fights simc needed before it converged on the target error. Fewer
+                        is not worse.
+                      </>
+                    }
+                  >
+                    <span>Iterations</span>
+                  </Tooltip>
+                </th>
                 <th className="num">Time</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => {
+              {tableRows.map((row) => {
                 const run = batch.find((r) => r.id === row.runId)!;
                 return (
                   <tr
@@ -180,9 +268,15 @@ export function BatchResults({
               <span className="muted" style={{ width: 34, textAlign: 'right' }}>
                 {run.progress}%
               </span>
-              <button className="danger-text" onClick={() => api.cancel(run.id)}>
-                stop
-              </button>
+              <Tooltip content={<><strong>Stop this run</strong>The rest of the batch continues.</>}>
+                <button
+                  className="danger-text"
+                  aria-label={'Stop ' + run.variantLabel}
+                  onClick={() => api.cancel(run.id)}
+                >
+                  <IconStop size={11} className="icon" />
+                </button>
+              </Tooltip>
             </div>
           ))}
           {failed.map((run) => (

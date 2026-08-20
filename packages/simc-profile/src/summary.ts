@@ -1,4 +1,12 @@
-import { GEAR_SLOTS, type GearItem, type GearSlot, type ProfileVariant, type SimcProfile } from './types.js';
+import {
+  GEAR_SLOTS,
+  type GearCandidate,
+  type GearItem,
+  type GearSlot,
+  type GearSwapVariant,
+  type ProfileVariant,
+  type SimcProfile,
+} from './types.js';
 
 /** Slots that do not contribute to the equipped item level average. */
 const COSMETIC_SLOTS = new Set<GearSlot>(['shirt', 'tabard']);
@@ -77,6 +85,7 @@ export function talentVariants(profile: SimcProfile): ProfileVariant[] {
   return profile.talents.map((loadout) => ({
     label: loadout.name + (loadout.active ? ' (equipped)' : ''),
     talents: loadout.hash,
+    baseline: loadout.active,
   }));
 }
 
@@ -89,9 +98,15 @@ export function talentVariants(profile: SimcProfile): ProfileVariant[] {
  * For rings and trinkets both positions are tried, because the export always
  * reports bag alternates against the first position.
  */
-export function bagSwapVariants(profile: SimcProfile): ProfileVariant[] {
-  const variants: ProfileVariant[] = [];
+export function bagSwapVariants(profile: SimcProfile): GearSwapVariant[] {
+  const variants: GearSwapVariant[] = [];
   const seen = new Set<string>();
+
+  const describe = (item: GearItem): GearCandidate => ({
+    id: item.id,
+    name: item.name ?? 'item ' + item.id,
+    itemLevel: item.itemLevel,
+  });
 
   for (const candidate of profile.bags) {
     if (!candidate.id) continue;
@@ -107,16 +122,66 @@ export function bagSwapVariants(profile: SimcProfile): ProfileVariant[] {
       if (seen.has(key)) continue;
       seen.add(key);
 
-      const name = candidate.name ?? 'item ' + candidate.id;
-      const replaced = current?.name ?? (current ? 'item ' + current.id : 'empty');
+      const to = describe(candidate);
+      const from = current?.id ? describe(current) : undefined;
+      const delta =
+        to.itemLevel !== undefined && from?.itemLevel !== undefined
+          ? to.itemLevel - from.itemLevel
+          : undefined;
+
       variants.push({
-        label: slot + ': ' + replaced + ' -> ' + name,
+        label: slot + ': ' + (from?.name ?? 'empty') + ' -> ' + to.name,
         gear: { [slot]: { ...candidate, slot, fromBags: false } },
+        slot,
+        candidate: to,
+        replaces: from,
+        itemLevelDelta: delta,
       });
     }
   }
 
   return variants;
+}
+
+/**
+ * The profile exactly as it is equipped.
+ *
+ * Every gear comparison must include this run. Without it a batch of swaps has
+ * nothing to measure against, and the natural fallback -- treating the lowest
+ * result as the reference -- reports every option as an improvement.
+ */
+export function equippedBaseline(profile: SimcProfile): ProfileVariant {
+  const spec = profile.meta.specLabel ?? profile.spec;
+  return { label: 'Currently equipped' + (spec ? ' (' + spec + ')' : ''), baseline: true };
+}
+
+/** Gear swaps grouped by the slot they target, each slot sorted by item level. */
+export function gearSwapsBySlot(profile: SimcProfile): Array<{
+  slot: GearSlot;
+  equipped?: GearCandidate;
+  candidates: GearSwapVariant[];
+}> {
+  const grouped = new Map<GearSlot, GearSwapVariant[]>();
+  for (const variant of bagSwapVariants(profile)) {
+    const list = grouped.get(variant.slot) ?? [];
+    list.push(variant);
+    grouped.set(variant.slot, list);
+  }
+
+  // Emit in simc's own slot order so the list reads like a character sheet
+  // rather than in whatever order the bags happened to be scanned.
+  return GEAR_SLOTS.filter((slot) => grouped.has(slot)).map((slot) => {
+    const equipped = profile.equipped[slot];
+    return {
+      slot,
+      equipped: equipped?.id
+        ? { id: equipped.id, name: equipped.name ?? 'item ' + equipped.id, itemLevel: equipped.itemLevel }
+        : undefined,
+      candidates: (grouped.get(slot) ?? []).sort(
+        (a, b) => (b.candidate.itemLevel ?? 0) - (a.candidate.itemLevel ?? 0),
+      ),
+    };
+  });
 }
 
 /**

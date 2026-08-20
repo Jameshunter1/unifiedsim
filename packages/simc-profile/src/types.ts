@@ -155,4 +155,35 @@ export interface ProfileVariant {
   gear?: Partial<Record<GearSlot, GearItem>>;
   /** Raw simc option lines appended verbatim, e.g. `fight_style=DungeonSlice`. */
   extraOptions?: string[];
+  /**
+   * This run is the reference the others are measured against.
+   *
+   * Explicit rather than inferred from the label: deltas are meaningless
+   * without a reference, and guessing one from text meant a batch of gear
+   * swaps silently compared everything against its own worst result.
+   */
+  baseline?: boolean;
+}
+
+/** An item as shown in a gear comparison: enough to label and rank a row. */
+export interface GearCandidate {
+  id: number;
+  name: string;
+  itemLevel?: number;
+}
+
+/**
+ * A gear variant, carrying the structure the UI needs to group and rank it.
+ *
+ * The label alone was not enough: grouping by slot meant parsing it back apart,
+ * and showing an item level delta meant it was not there at all.
+ */
+export interface GearSwapVariant extends ProfileVariant {
+  slot: GearSlot;
+  /** The item being tried. */
+  candidate: GearCandidate;
+  /** What it displaces, absent when the slot is empty. */
+  replaces?: GearCandidate;
+  /** Candidate item level minus current, when both are known. */
+  itemLevelDelta?: number;
 }

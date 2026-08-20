@@ -87,6 +87,28 @@ export interface Variant {
   label: string;
   talents?: string;
   gear?: Record<string, GearItem>;
+  /** This run is the reference the rest of the batch is measured against. */
+  baseline?: boolean;
+}
+
+export interface GearCandidate {
+  id: number;
+  name: string;
+  itemLevel?: number;
+}
+
+export interface GearSwapVariant extends Variant {
+  slot: string;
+  candidate: GearCandidate;
+  replaces?: GearCandidate;
+  itemLevelDelta?: number;
+}
+
+/** Bag alternates for one slot, with whatever is currently worn there. */
+export interface SlotGroup {
+  slot: string;
+  equipped?: GearCandidate;
+  candidates: GearSwapVariant[];
 }
 
 export interface AbilityBreakdown {
@@ -119,6 +141,7 @@ export interface SimRun {
   profileId: string;
   batchId?: string;
   variantLabel: string;
+  isBaseline?: boolean;
   engine: string;
   status: RunStatus;
   options: {
@@ -178,7 +201,9 @@ export const api = {
   variants: (id: string) =>
     request<{
       talents: Variant[];
-      gear: Variant[];
+      gear: GearSwapVariant[];
+      gearBySlot: SlotGroup[];
+      baseline: Variant;
       suggestedCount: number;
       exhaustiveCount: number;
     }>('/profiles/' + id + '/variants'),

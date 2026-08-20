@@ -6,6 +6,8 @@ import { describe, it } from 'node:test';
 import {
   bagSwapVariants,
   bagsBySlot,
+  equippedBaseline,
+  gearSwapsBySlot,
   parseProfile,
   permutationCount,
   serializeProfile,
@@ -235,6 +237,59 @@ describe('variant generation', () => {
     assert.equal(swap.gear?.back?.id, 268248);
     assert.equal(swap.gear?.back?.fromBags, false);
     assert.equal(Object.keys(swap.gear!).length, 1);
+  });
+});
+
+describe('gear comparison', () => {
+  it('groups swaps by slot, in character-sheet order', () => {
+    const groups = gearSwapsBySlot(profile);
+    assert.deepEqual(
+      groups.map((g) => g.slot),
+      ['head', 'shoulder', 'back', 'chest', 'wrist', 'hands', 'waist', 'feet',
+       'finger1', 'finger2', 'trinket1', 'trinket2', 'main_hand'],
+    );
+  });
+
+  it('names what is currently worn in each slot', () => {
+    const shoulder = gearSwapsBySlot(profile).find((g) => g.slot === 'shoulder')!;
+    assert.equal(shoulder.equipped?.name, "Brood Cleanser's Amice");
+    assert.equal(shoulder.equipped?.itemLevel, 292);
+    assert.equal(shoulder.candidates.length, 3);
+  });
+
+  it('sorts each slot by candidate item level, highest first', () => {
+    const shoulder = gearSwapsBySlot(profile).find((g) => g.slot === 'shoulder')!;
+    assert.deepEqual(
+      shoulder.candidates.map((c) => c.candidate.itemLevel),
+      [292, 263, 201],
+    );
+  });
+
+  it('carries the item level delta against the equipped item', () => {
+    const shoulder = gearSwapsBySlot(profile).find((g) => g.slot === 'shoulder')!;
+    const courtly = shoulder.candidates.find((c) => c.candidate.name === 'Courtly Shoulders')!;
+    // 201 against the equipped 292.
+    assert.equal(courtly.itemLevelDelta, -91);
+  });
+
+  it('offers ring and trinket alternates against both positions', () => {
+    const groups = gearSwapsBySlot(profile);
+    assert.equal(groups.find((g) => g.slot === 'finger1')!.candidates.length, 3);
+    assert.equal(groups.find((g) => g.slot === 'finger2')!.candidates.length, 3);
+  });
+
+  it('marks the equipped baseline as the reference', () => {
+    const base = equippedBaseline(profile);
+    assert.equal(base.baseline, true);
+    assert.equal(base.gear, undefined);
+    assert.equal(base.talents, undefined);
+    assert.match(base.label, /Currently equipped/);
+  });
+
+  it('marks only the active talent loadout as the reference', () => {
+    const flagged = talentVariants(profile).filter((v) => v.baseline);
+    assert.equal(flagged.length, 1);
+    assert.equal(flagged[0]!.label, 'Active (equipped)');
   });
 });
 

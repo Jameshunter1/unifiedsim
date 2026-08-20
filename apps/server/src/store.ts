@@ -39,6 +39,8 @@ export interface SimRun {
   /** Groups runs launched together, so the UI can show a batch as one unit. */
   batchId?: string;
   variantLabel: string;
+  /** This run is the reference the rest of its batch is measured against. */
+  isBaseline?: boolean;
   engine: string;
   status: RunStatus;
   options: RunOptions;
