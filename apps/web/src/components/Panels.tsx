@@ -2,9 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { api, type Health, type Profile, type ProfileDetail, type Variant } from '../api.ts';
 
-/* ---------------------------------------------------------------- banners */
+/* ----------------------------------------------------------------- status */
 
+/**
+ * Engine and bridge status.
+ *
+ * Healthy state collapses to a single line of pills. Two full-width banners
+ * saying "everything is fine" cost ~140px at the top of every session and were
+ * read once, on the first run. A problem still gets a full banner, because a
+ * problem is the one time the detail is worth the space.
+ */
 export function EngineBanner({ health }: { health: Health | null }) {
+  const [expanded, setExpanded] = useState(false);
+
   if (!health) return null;
 
   const watch = health.watch;
@@ -13,75 +23,105 @@ export function EngineBanner({ health }: { health: Health | null }) {
   // Only the engines a user can act on; the planned tiers are noise here.
   const actionable = health.engines.filter((e) => e.id === 'local-simc' || e.id === 'docker-simc');
 
+  const watchNeedsAttention = !watch.watching || Boolean(watch.awaitingFirstExport);
+  const healthy = Boolean(active) && !watchNeedsAttention;
+
+  if (healthy) {
+    return (
+      <div className="statusbar">
+        <button
+          className="status-pill"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          title="Engine and addon details"
+        >
+          <span className="dot" style={{ background: 'var(--status-good)' }} aria-hidden="true" />
+          {active!.version?.replace(/^.*?(SimulationCraft)/i, '$1').split(' for ')[0] ?? active!.label}
+          <span className="muted"> · addon connected</span>
+          <span className="muted" aria-hidden="true">
+            {expanded ? '▴' : '▾'}
+          </span>
+        </button>
+
+        {expanded && (
+          <div className="status-detail mono">
+            <div>{active!.location}</div>
+            <div>{watch.path}</div>
+            <div className="muted" style={{ fontFamily: 'var(--font)' }}>
+              Run <code>/usim sync</code> in game to push a profile.
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <>
-      {active ? (
+      {!active &&
+        (probing ? (
+          <div className="banner">
+            <span className="icon muted" aria-hidden="true">
+              ◐
+            </span>
+            <div className="secondary">Checking simulation engines…</div>
+          </div>
+        ) : (
+          <div className="banner warn">
+            <span className="icon" aria-hidden="true">
+              ⚠
+            </span>
+            <div>
+              <strong>No simulation engine available.</strong>
+              {actionable.map((e) => (
+                <div key={e.id} className="secondary" style={{ fontSize: 12, marginTop: 4 }}>
+                  <strong>{e.label}:</strong> {e.reason}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+      {watchNeedsAttention && (
         <div className="banner">
-          <span className="icon" aria-hidden="true" style={{ color: 'var(--status-good)' }}>
-            ●
+          <span
+            className="icon"
+            aria-hidden="true"
+            style={{ color: watch.watching ? 'var(--status-warning)' : 'var(--text-muted)' }}
+          >
+            {watch.watching ? '◐' : '○'}
           </span>
           <div className="secondary">
-            <strong>{active.label}</strong> ready
-            {active.version && <> — {active.version}</>}
-            {active.location && <span className="muted"> · {active.location}</span>}
-          </div>
-        </div>
-      ) : probing ? (
-        <div className="banner">
-          <span className="icon muted" aria-hidden="true">
-            ◐
-          </span>
-          <div className="secondary">Checking simulation engines…</div>
-        </div>
-      ) : (
-        <div className="banner warn">
-          <span className="icon" aria-hidden="true">
-            ⚠
-          </span>
-          <div>
-            <strong>No simulation engine available.</strong>
-            {actionable.map((e) => (
-              <div key={e.id} className="secondary" style={{ fontSize: 12, marginTop: 4 }}>
-                <strong>{e.label}:</strong> {e.reason}
-              </div>
-            ))}
+            {watch.watching ? (
+              <>
+                Addon installed but has never run. Restart WoW (a new addon needs a client restart,
+                not just <code>/reload</code>), enable <strong>UnifiedSim</strong>, then run{' '}
+                <code>/usim sync</code>.
+                <div className="muted mono" style={{ fontSize: 11, marginTop: 2 }}>
+                  {watch.path}
+                </div>
+              </>
+            ) : (
+              <>
+                <strong>Addon bridge inactive.</strong>{' '}
+                <span className="muted">{watch.reason}</span>
+                <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                  Optional — you can paste profiles by hand without it.
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      <div className="banner">
-        <span
-          className="icon"
-          aria-hidden="true"
-          style={{ color: watch.watching ? 'var(--status-good)' : 'var(--text-muted)' }}
-        >
-          {watch.watching ? '●' : '○'}
-        </span>
-        <div className="secondary">
-          {watch.watching ? (
-            <>
-              {watch.awaitingFirstExport ? (
-                <>
-                  Addon installed but has never run. Restart WoW (a new addon needs a client
-                  restart, not just <code>/reload</code>), enable <strong>UnifiedSim</strong>, then
-                  run <code>/usim sync</code>.
-                </>
-              ) : (
-                <>
-                  Watching SavedVariables — run <code>/usim sync</code> in game to push a profile.
-                </>
-              )}
-              <div className="muted mono" style={{ fontSize: 11, marginTop: 2 }}>
-                {watch.path}
-              </div>
-            </>
-          ) : (
-            <>
-              <strong>Addon bridge inactive.</strong> <span className="muted">{watch.reason}</span>
-            </>
-          )}
+      {active && (
+        <div className="statusbar">
+          <span className="status-pill" style={{ cursor: 'default' }}>
+            <span className="dot" style={{ background: 'var(--status-good)' }} aria-hidden="true" />
+            {active.version?.split(' for ')[0] ?? active.label}
+          </span>
         </div>
-      </div>
+      )}
     </>
   );
 }

@@ -225,6 +225,40 @@ header.masthead .sub {
   color: var(--text-muted);
 }
 
+/* Compact status line, shown when the engine and bridge are both healthy. */
+.statusbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+}
+
+.status-detail {
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-1);
+  word-break: break-all;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
 .banner {
   border: 1px solid var(--border);
   border-radius: var(--radius);

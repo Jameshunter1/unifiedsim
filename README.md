@@ -224,7 +224,7 @@ more than one machine, and why the engine interface has a distributed slot.
 | | |
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | How the system fits together today, and what is still unknown |
-| [docs/adr/](docs/adr/README.md) | Why it is built this way — 14 decision records |
+| [docs/adr/](docs/adr/README.md) | Why it is built this way — 15 decision records |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Setup, the rules a PR is held to, and how to work on the addon |
 | [engine-wasm/README.md](engine-wasm/README.md) | What porting simc to WebAssembly actually involves |
 | [NOTICE.md](NOTICE.md) | Third-party notices — simc is GPL-3.0 and is run, not bundled |
@@ -245,7 +245,7 @@ explaining why, so they are not mistaken for oversights and quietly reverted.
 | Path | |
 |---|---|
 | `packages/simc-profile` | Parser / serialiser for the SimC addon export format (40 tests) |
-| `apps/server` | Express API, job queue, engine interface, SavedVariables watcher (21 tests) |
+| `apps/server` | Express API, job queue, engine interface, SavedVariables watcher (25 tests) |
 | `apps/web` | React UI (also runs standalone in a browser) |
 | `apps/desktop` | Electron shell: hosts the server, tray, menus, native install flows |
 | `addon/UnifiedSim` | The in-game addon |
@@ -256,10 +256,14 @@ explaining why, so they are not mistaken for oversights and quietly reverted.
 ## Development
 
 ```bash
-npm test            # profile parser tests
-npm run typecheck   # all workspaces
-npm run build       # all workspaces
+npm test            # 65 unit tests across the parser and server
+npm run typecheck   # all workspaces, in dependency order
+npm run build       # all workspaces, in dependency order
 ```
+
+Workspaces build in an explicit dependency order rather than with
+`--workspaces`, which runs them arbitrarily and let the desktop app type-check
+before the server it imports types from had emitted anything.
 
 The server needs `@usim/simc-profile` built at least once
 (`npm run build --workspace=@usim/simc-profile`); `npm run build` does that
