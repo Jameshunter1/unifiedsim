@@ -146,6 +146,50 @@ try {
   // so it is never network-idle, and `load` fires before React has fetched.
   await sleep(settle);
 
+  /**
+   * Optional interaction before capture.
+   *
+   * Hover-only UI -- tooltips above all -- cannot be verified from a plain
+   * screenshot, and "it should appear" is not evidence. `--click` reaches a
+   * panel by the visible text of a control; `--hover` then moves a real pointer
+   * onto an element, because a synthetic mouseover would not exercise CSS
+   * :hover or React's own enter handling the same way.
+   */
+  const clickText = val('click', null);
+  if (clickText) {
+    const clicked = await client.send('Runtime.evaluate', {
+      expression:
+        '(() => { const t = ' + JSON.stringify(clickText) + ';' +
+        " const el = [...document.querySelectorAll('button, [role=tab], a')]" +
+        '   .find((b) => (b.textContent || "").includes(t));' +
+        ' if (el) el.click(); return Boolean(el); })()',
+      returnByValue: true,
+    });
+    if (!clicked.result?.value) throw new Error('No control found containing text: ' + clickText);
+    await sleep(700);
+  }
+
+  const hoverSelector = val('hover', null);
+  if (hoverSelector) {
+    const box = await client.send('Runtime.evaluate', {
+      expression:
+        '(() => { const el = document.querySelector(' + JSON.stringify(hoverSelector) + ');' +
+        ' if (!el) return null; const r = el.getBoundingClientRect();' +
+        ' if (!r.width || !r.height) return null;' +
+        ' return JSON.stringify({ x: r.left + r.width / 2, y: r.top + r.height / 2 }); })()',
+      returnByValue: true,
+    });
+    if (!box.result?.value) throw new Error('Nothing visible matches selector: ' + hoverSelector);
+    const { x, y } = JSON.parse(box.result.value);
+
+    // Approach from off-target first: entering from "nowhere" is what a real
+    // pointer does, and some handlers only fire on an actual transition.
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 2, y: 2 });
+    await sleep(80);
+    await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+    await sleep(Number(val('hoverSettle', 700)));
+  }
+
   const { data } = await client.send('Page.captureScreenshot', {
     format: 'png',
     captureBeyondViewport: flag('full'),
