@@ -236,6 +236,9 @@ export const api = {
 
   gearStats: (id: string) => request<GearStats>('/profiles/' + id + '/gear-stats'),
 
+  /** Forces an immediate engine re-probe instead of waiting for the sweep. */
+  refreshEngines: () => request<{ engines: EngineStatus[] }>('/engines/refresh', { method: 'POST' }),
+
   runs: (profileId?: string) =>
     request<{ runs: SimRun[]; queue: { queued: number; running: number } }>(
       '/runs' + (profileId ? '?profileId=' + encodeURIComponent(profileId) : ''),

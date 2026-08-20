@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { api, type Health, type Profile, type ProfileDetail, type SimRun } from './api.ts';
-import { CharacterCard, EngineBanner, LaunchPanel, ProfilePanel } from './components/Panels.tsx';
+import { CharacterPanel, EngineBanner, LaunchPanel, Welcome } from './components/Panels.tsx';
 import { BatchResults, HistoryCard, RunDetail } from './components/Results.tsx';
+import { Tooltip } from './components/Tooltip.tsx';
 import { useEvents } from './useEvents.ts';
 
 type Theme = 'system' | 'light' | 'dark';
@@ -47,6 +48,12 @@ export default function App() {
         setLoadError('Cannot reach the server: ' + err.message);
       });
   }, []);
+
+  /** The masthead action: re-probe engines now, then re-read state. */
+  const recheckEngines = useCallback(async () => {
+    await api.refreshEngines().catch(() => undefined);
+    refreshHealth();
+  }, [refreshHealth]);
 
   const refreshProfiles = useCallback(async () => {
     try {
@@ -140,7 +147,9 @@ export default function App() {
             break;
 
           case 'queue':
-            setHealth((prev) => (prev ? { ...prev, queue: { queued: event.queued, running: event.running } } : prev));
+            setHealth((prev) =>
+              prev ? { ...prev, queue: { queued: event.queued, running: event.running } } : prev,
+            );
             break;
 
           default:
@@ -169,7 +178,23 @@ export default function App() {
     setLiveLog([]);
   }, []);
 
+  const doneRuns = useMemo(() => runs.filter((r) => r.status === 'done' && r.result), [runs]);
+  const bestDps = useMemo(
+    () => (doneRuns.length ? Math.max(...doneRuns.map((r) => r.result!.dps)) : undefined),
+    [doneRuns],
+  );
+
+  const importAndSelect = useCallback(
+    (id: string) => {
+      refreshProfiles()
+        .catch(() => undefined)
+        .finally(() => setSelectedProfileId(id));
+    },
+    [refreshProfiles],
+  );
+
   const queue = health?.queue;
+  const hasProfiles = profiles.length > 0;
 
   return (
     <div className="app">
@@ -193,7 +218,17 @@ export default function App() {
           <option value="light">Light</option>
           <option value="dark">Dark</option>
         </select>
-        <button onClick={refreshHealth}>Refresh</button>
+        <Tooltip
+          content={
+            <>
+              <strong>Re-check engines</strong>
+              Probes each simulation backend again right now, instead of waiting for the periodic
+              sweep. Use it after starting Docker or installing SimulationCraft.
+            </>
+          }
+        >
+          <button onClick={() => void recheckEngines()}>Re-check engines</button>
+        </Tooltip>
       </header>
 
       {loadError && (
@@ -212,45 +247,68 @@ export default function App() {
 
       <EngineBanner health={health} />
 
-      <div className="grid-2">
-        <div>
-          <ProfilePanel
-            profiles={profiles}
-            selectedId={selectedProfileId}
-            onSelect={setSelectedProfileId}
-            onImported={() => refreshProfiles().catch(() => undefined)}
-            onDeleted={() => {
-              setSelectedProfileId(null);
-              refreshProfiles().catch(() => undefined);
-            }}
-          />
-
-          {detail && <CharacterCard detail={detail} />}
-
-          {selectedProfileId && (
-            <LaunchPanel
-              profileId={selectedProfileId}
-              health={health}
-              onLaunched={(id) => {
-                setBatchId(id);
-                setSelectedRunId(null);
-                refreshRuns(selectedProfileId).catch(() => undefined);
+      {!hasProfiles ? (
+        <Welcome onImported={importAndSelect} />
+      ) : (
+        <div className="workspace">
+          <aside className="setup">
+            <CharacterPanel
+              profiles={profiles}
+              selectedId={selectedProfileId}
+              detail={detail}
+              bestDps={bestDps}
+              onSelect={setSelectedProfileId}
+              onImported={importAndSelect}
+              onDeleted={() => {
+                setSelectedProfileId(null);
+                refreshProfiles().catch(() => undefined);
               }}
             />
-          )}
-        </div>
 
-        <div>
-          <BatchResults
-            runs={runs}
-            batchId={batchId}
-            onSelectRun={selectRun}
-            selectedRunId={selectedRunId}
-          />
-          <RunDetail run={selectedRun} liveLog={selectedRun?.status === 'running' ? liveLog : []} />
-          <HistoryCard runs={runs} onSelectRun={selectRun} />
+            {selectedProfileId && (
+              <LaunchPanel
+                profileId={selectedProfileId}
+                health={health}
+                onLaunched={(id) => {
+                  setBatchId(id);
+                  setSelectedRunId(null);
+                  refreshRuns(selectedProfileId).catch(() => undefined);
+                }}
+              />
+            )}
+          </aside>
+
+          <main className="results-col">
+            {runs.length === 0 ? (
+              // One purposeful hint instead of three cards of unreachable
+              // empty states stacked down the column.
+              <div className="card">
+                <h2>Results</h2>
+                <div className="empty">
+                  Pick talent loadouts or gear swaps on the left and run — results land here,
+                  ranked against your equipped baseline.
+                </div>
+              </div>
+            ) : (
+              <>
+                <BatchResults
+                  runs={runs}
+                  batchId={batchId}
+                  onSelectRun={selectRun}
+                  selectedRunId={selectedRunId}
+                />
+                {selectedRun && (
+                  <RunDetail
+                    run={selectedRun}
+                    liveLog={selectedRun.status === 'running' ? liveLog : []}
+                  />
+                )}
+                {doneRuns.length > 0 && <HistoryCard runs={runs} onSelectRun={selectRun} />}
+              </>
+            )}
+          </main>
         </div>
-      </div>
+      )}
     </div>
   );
 }

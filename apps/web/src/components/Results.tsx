@@ -101,14 +101,9 @@ export function BatchResults({
 
   const sortDir = (key: string) => (sort.key === key ? sort.dir : null);
 
-  if (!batch.length) {
-    return (
-      <div className="card">
-        <h2>Latest batch</h2>
-        <div className="empty">No runs yet. Pick some variants and hit Run.</div>
-      </div>
-    );
-  }
+  // The parent renders this card only when a batch exists; this guard is a
+  // fallback, and an empty card would just be a rectangle of nothing.
+  if (!batch.length) return null;
 
   return (
     <div className="card">
@@ -150,6 +145,7 @@ export function BatchResults({
 
       {/* Table view: the relief path for the sub-3:1 contrast warning, and the
           only place every number is readable without hovering. */}
+      {rows.length > 0 && (
       <details style={{ marginTop: 12 }} open={rows.length <= 6}>
         <summary className="muted" style={{ cursor: 'pointer', fontSize: 12 }}>
           Table view
@@ -253,6 +249,7 @@ export function BatchResults({
           </table>
         </div>
       </details>
+      )}
 
       {(pending.length > 0 || failed.length > 0) && (
         <div style={{ marginTop: 14 }}>
@@ -386,13 +383,34 @@ export function RunDetail({ run, liveLog }: { run: SimRun | null; liveLog: strin
 export function HistoryCard({ runs, onSelectRun }: { runs: SimRun[]; onSelectRun: (id: string) => void }) {
   const done = runs.filter((r) => r.status === 'done' && r.result);
 
+  /**
+   * Only reference runs are charted. A line through every completed run mixes
+   * talent loadouts and gear experiments into one series, so its dips read as
+   * "my DPS dropped" when they mean "a different variant ran". Runs written
+   * before the baseline flag existed are recognised by their labels.
+   */
+  const isReference = (r: SimRun) =>
+    r.isBaseline ??
+    (r.variantLabel === 'baseline' ||
+      r.variantLabel.includes('(equipped)') ||
+      r.variantLabel.startsWith('Equipped:') ||
+      r.variantLabel.startsWith('Currently equipped'));
+  const referenceRuns = done.filter(isReference);
+
   return (
     <div className="card">
       <h2>
-        DPS over time
-        <span className="note">{done.length} completed runs for this profile</span>
+        Baseline DPS over time
+        <span className="note">reference runs only — variants aren't comparable across time</span>
       </h2>
-      <DpsHistory runs={runs} />
+      {referenceRuns.length >= 2 ? (
+        <DpsHistory runs={referenceRuns} />
+      ) : (
+        <div className="empty">
+          Charts your equipped setup as gear improves. It needs two reference runs — every gear
+          comparison records one automatically.
+        </div>
+      )}
 
       {done.length > 0 && (
         <details style={{ marginTop: 12 }}>

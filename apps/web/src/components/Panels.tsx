@@ -12,7 +12,7 @@ import {
   type SlotGroup,
   type Variant,
 } from '../api.ts';
-import { IconPlay, IconSearch, IconTrash, SlotIcon } from './Icons.tsx';
+import { IconImport, IconPlay, IconSearch, IconTrash, SlotIcon } from './Icons.tsx';
 import { ItemCard } from './ItemCard.tsx';
 import { Hint, Tooltip } from './Tooltip.tsx';
 
@@ -50,7 +50,7 @@ export function EngineBanner({ health }: { health: Health | null }) {
           title="Engine and addon details"
         >
           <span className="dot" style={{ background: 'var(--status-good)' }} aria-hidden="true" />
-          {active!.version?.replace(/^.*?(SimulationCraft)/i, '$1').split(' for ')[0] ?? active!.label}
+          {active!.version?.split(' for ')[0] ?? active!.label}
           <span className="muted"> · addon connected</span>
           <span className="muted" aria-hidden="true">
             {expanded ? '▴' : '▾'}
@@ -140,21 +140,13 @@ export function EngineBanner({ health }: { health: Health | null }) {
   );
 }
 
-/* --------------------------------------------------------------- profiles */
+/* ------------------------------------------------------ importing profiles */
 
-export function ProfilePanel({
-  profiles,
-  selectedId,
-  onSelect,
-  onImported,
-  onDeleted,
-}: {
-  profiles: Profile[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  onImported: () => void;
-  onDeleted: () => void;
-}) {
+/**
+ * The paste-a-profile flow, shared by the character panel and the first-run
+ * welcome so both import paths behave identically.
+ */
+function ImportBox({ onImported }: { onImported: (id: string) => void }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -167,8 +159,7 @@ export function ProfilePanel({
       const { profile } = await api.importProfile(text);
       setText('');
       setOpen(false);
-      onImported();
-      onSelect(profile.id);
+      onImported(profile.id);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -176,137 +167,162 @@ export function ProfilePanel({
     }
   };
 
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)}>
+        <IconImport size={13} className="icon" /> Paste a profile
+      </button>
+    );
+  }
+
   return (
-    <div className="card">
-      <h2>
-        Profiles
-        <span className="note">{profiles.length}</span>
-      </h2>
-
-      {profiles.length === 0 && !open && (
-        <div className="empty">
-          Nothing imported yet. Paste a <code>/simc</code> export to start.
+    <div className="field">
+      <textarea
+        rows={7}
+        value={text}
+        placeholder={'mage="Darvage"' + String.fromCharCode(10) + 'level=90' + String.fromCharCode(10) + 'spec=frost'}
+        onChange={(e) => setText(e.target.value)}
+        autoFocus
+      />
+      {error && (
+        <div className="secondary" style={{ color: 'var(--status-critical)', fontSize: 12 }}>
+          {error}
         </div>
       )}
-
-      {profiles.length > 0 && (
-        <div style={{ marginBottom: 12 }}>
-          {profiles.map((profile) => (
-            <div
-              key={profile.id}
-              className="row"
-              style={{
-                padding: '6px 8px',
-                borderRadius: 8,
-                background: profile.id === selectedId ? 'var(--page)' : 'transparent',
-                flexWrap: 'nowrap',
-              }}
-            >
-              <button
-                onClick={() => onSelect(profile.id)}
-                style={{
-                  border: 'none',
-                  background: 'none',
-                  padding: 0,
-                  textAlign: 'left',
-                  flex: 1,
-                  minWidth: 0,
-                }}
-              >
-                <div style={{ fontWeight: profile.id === selectedId ? 600 : 400 }}>{profile.label}</div>
-                <div className="muted" style={{ fontSize: 11 }}>
-                  {profile.averageItemLevel ? profile.averageItemLevel + ' ilvl · ' : ''}
-                  {profile.source} · {new Date(profile.createdAt).toLocaleString()}
-                </div>
-              </button>
-              <Tooltip
-                content={
-                  <>
-                    <strong>Delete this profile</strong>
-                    Also removes every simulation run recorded against it. The character in game is
-                    untouched.
-                  </>
-                }
-              >
-                <button
-                  className="danger-text"
-                  aria-label={'Delete ' + profile.label}
-                  onClick={async () => {
-                    await api.deleteProfile(profile.id);
-                    onDeleted();
-                  }}
-                >
-                  <IconTrash size={13} className="icon" />
-                </button>
-              </Tooltip>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {open ? (
-        <div className="field">
-          <textarea
-            rows={8}
-            value={text}
-            placeholder={'mage="Darvage"\nlevel=90\nspec=frost\n…'}
-            onChange={(e) => setText(e.target.value)}
-          />
-          {error && (
-            <div className="secondary" style={{ color: 'var(--status-critical)', fontSize: 12 }}>
-              {error}
-            </div>
-          )}
-          <div className="row">
-            <button className="primary" disabled={!text.trim() || busy} onClick={submit}>
-              {busy ? 'Importing…' : 'Import'}
-            </button>
-            <button onClick={() => setOpen(false)}>Cancel</button>
-          </div>
-        </div>
-      ) : (
-        <button onClick={() => setOpen(true)}>Paste a profile</button>
-      )}
+      <div className="row">
+        <button className="primary" disabled={!text.trim() || busy} onClick={submit}>
+          {busy ? 'Importing…' : 'Import'}
+        </button>
+        <button onClick={() => setOpen(false)}>Cancel</button>
+      </div>
     </div>
   );
 }
 
-/* ------------------------------------------------------- character summary */
+/**
+ * First run, before any profile exists.
+ *
+ * One card naming the three ways in, ordered by effort, instead of four cards
+ * of empty states describing panels that cannot be reached yet.
+ */
+export function Welcome({ onImported }: { onImported: (id: string) => void }) {
+  return (
+    <div className="card welcome">
+      <h2>Get your character in</h2>
+      <ol className="routes">
+        <li>
+          <strong>Automatic.</strong> Install the in-game addon via{' '}
+          <span className="menu-path">Tools → Install WoW addon…</span>, then type{' '}
+          <code>/usim sync</code> in game. Every sync imports itself — no copying.
+        </li>
+        <li>
+          <strong>Paste.</strong> Copy the export from the SimulationCraft addon
+          (<code>/simc</code>) and paste it below.
+        </li>
+        <li>
+          <strong>File.</strong>{' '}
+          <span className="menu-path">File → Import profile from file…</span> opens a
+          saved <code>.simc</code>.
+        </li>
+      </ol>
+      <ImportBox onImported={onImported} />
+    </div>
+  );
+}
 
-export function CharacterCard({ detail }: { detail: ProfileDetail }) {
-  const { summary } = detail;
-  const equipped = Object.values(detail.equipped).sort((a, b) => (b.itemLevel ?? 0) - (a.itemLevel ?? 0));
+/* ---------------------------------------------------------------- character */
+
+/**
+ * The selected character: identity, the two numbers that matter, gear, and any
+ * other imported snapshots.
+ *
+ * Replaces the old Profiles + Character pair, which spent two cards and five
+ * stat slots on this. Level is gone (constant at cap) and the loadout and
+ * bag-alternate counts are gone (the Run tabs already carry both); best simmed
+ * DPS sits next to item level instead, because those are the two numbers a
+ * decision ever rests on.
+ */
+export function CharacterPanel({
+  profiles,
+  selectedId,
+  detail,
+  bestDps,
+  onSelect,
+  onImported,
+  onDeleted,
+}: {
+  profiles: Profile[];
+  selectedId: string | null;
+  detail: ProfileDetail | null;
+  bestDps?: number;
+  onSelect: (id: string) => void;
+  onImported: (id: string) => void;
+  onDeleted: () => void;
+}) {
+  const current = profiles.find((p) => p.id === selectedId) ?? null;
+  const summary = detail?.summary;
+  const others = profiles.filter((p) => p.id !== selectedId);
+  const equipped = detail
+    ? Object.values(detail.equipped).sort((a, b) => (b.itemLevel ?? 0) - (a.itemLevel ?? 0))
+    : [];
+
+  if (!current) return null;
 
   return (
-    <div className="card">
-      <h2>Character</h2>
-      <div className="stat-row" style={{ marginBottom: 14 }}>
-        <div className="stat">
-          <div className="label">Item level</div>
-          <div className="value">{summary.averageItemLevel ?? '—'}</div>
-        </div>
-        <div className="stat">
-          <div className="label">Spec</div>
-          <div className="value" style={{ textTransform: 'capitalize' }}>
-            {summary.spec ?? '—'}
+    <div className="card char-card">
+      <div className="char-head">
+        <div style={{ minWidth: 0 }}>
+          <div className="char-name">{summary?.characterName ?? current.label}</div>
+          <div className="char-sub">
+            {[summary?.spec, summary?.className, summary?.realm].filter(Boolean).join(' · ')}
+            {' · '}
+            {current.source} {new Date(current.createdAt).toLocaleDateString()}
           </div>
         </div>
+        <Tooltip
+          content={
+            <>
+              <strong>Delete this snapshot</strong>
+              Also removes every simulation run recorded against it. The character in game is
+              untouched.
+            </>
+          }
+        >
+          <button
+            className="danger-text"
+            aria-label={'Delete ' + current.label}
+            onClick={async () => {
+              await api.deleteProfile(current.id);
+              onDeleted();
+            }}
+          >
+            <IconTrash size={13} className="icon" />
+          </button>
+        </Tooltip>
+      </div>
+
+      <div className="stat-row">
         <div className="stat">
-          <div className="label">Level</div>
-          <div className="value">{summary.level ?? '—'}</div>
+          <div className="label">Item level</div>
+          <div className="value">{summary?.averageItemLevel ?? '—'}</div>
         </div>
         <div className="stat">
-          <div className="label">Loadouts</div>
-          <div className="value">{summary.loadoutNames.length}</div>
-        </div>
-        <div className="stat">
-          <div className="label">Bag alternates</div>
-          <div className="value">{summary.bagCount}</div>
+          <div className="label">Best simmed</div>
+          <div className="value">
+            {bestDps ? (
+              <>
+                {Math.round(bestDps).toLocaleString()}
+                <span className="unit"> dps</span>
+              </>
+            ) : (
+              '—'
+            )}
+          </div>
         </div>
       </div>
 
-      {summary.warnings.length > 0 && (
-        <div className="banner warn" style={{ marginBottom: 12 }}>
+      {summary && summary.warnings.length > 0 && (
+        <div className="banner warn" style={{ margin: 0 }}>
           <span className="icon" aria-hidden="true">
             ⚠
           </span>
@@ -318,31 +334,54 @@ export function CharacterCard({ detail }: { detail: ProfileDetail }) {
         </div>
       )}
 
-      <details>
-        <summary className="muted" style={{ cursor: 'pointer', fontSize: 12 }}>
-          Equipped gear
-        </summary>
-        <div className="scroll-x" style={{ marginTop: 8 }}>
-          <table>
-            <thead>
-              <tr>
-                <th>Slot</th>
-                <th>Item</th>
-                <th className="num">ilvl</th>
-              </tr>
-            </thead>
-            <tbody>
-              {equipped.map((item) => (
-                <tr key={item.slot}>
-                  <td className="muted">{item.slot}</td>
-                  <td>{item.name ?? 'item ' + item.id}</td>
-                  <td className="num">{item.itemLevel ?? '—'}</td>
+      {detail && (
+        <details>
+          <summary className="muted" style={{ cursor: 'pointer', fontSize: 12 }}>
+            Equipped gear
+          </summary>
+          <div className="scroll-x" style={{ marginTop: 8 }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Slot</th>
+                  <th>Item</th>
+                  <th className="num">ilvl</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </details>
+              </thead>
+              <tbody>
+                {equipped.map((item) => (
+                  <tr key={item.slot}>
+                    <td className="muted">{item.slot}</td>
+                    <td>{item.name ?? 'item ' + item.id}</td>
+                    <td className="num">{item.itemLevel ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
+
+      {others.length > 0 && (
+        <details>
+          <summary className="muted" style={{ cursor: 'pointer', fontSize: 12 }}>
+            Other snapshots ({others.length})
+          </summary>
+          <div className="snapshots">
+            {others.map((profile) => (
+              <button key={profile.id} className="snapshot-row" onClick={() => onSelect(profile.id)}>
+                <span className="snap-label">{profile.label}</span>
+                <span className="muted">
+                  {profile.averageItemLevel ? profile.averageItemLevel + ' · ' : ''}
+                  {profile.source} {new Date(profile.createdAt).toLocaleDateString()}
+                </span>
+              </button>
+            ))}
+          </div>
+        </details>
+      )}
+
+      <ImportBox onImported={onImported} />
     </div>
   );
 }
@@ -518,15 +557,7 @@ export function LaunchPanel({
 
   return (
     <div className="card">
-      <h2>
-        Run
-        <span className="note">
-          {selected.length || 1} sim{(selected.length || 1) === 1 ? '' : 's'}
-          {exhaustive > 1000 && (
-            <> · exhaustive search would be {exhaustive.toLocaleString()} permutations</>
-          )}
-        </span>
-      </h2>
+      <h2>Run a simulation</h2>
 
       <div className="tabs">
         <button aria-selected={tab === 'talents'} onClick={() => setTab('talents')}>
@@ -685,6 +716,22 @@ export function LaunchPanel({
               ))}
             </section>
           ))}
+
+          {gearBySlot.length > 0 && (
+            <div className="coverage">
+              {gearVariants.length} single-slot swaps
+              {exhaustive > 1000 && (
+                <>
+                  {' · '}every combination at once would be{' '}
+                  {new Intl.NumberFormat(undefined, {
+                    notation: 'compact',
+                    maximumFractionDigits: 1,
+                  }).format(exhaustive)}{' '}
+                  sims
+                </>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -797,7 +844,8 @@ export function LaunchPanel({
       )}
 
       <div className="row">
-        <button className="primary" disabled={busy || !engineReady} onClick={launch}>
+        <button className="primary run-btn" disabled={busy || !engineReady} onClick={launch}>
+          <IconPlay size={12} className="icon" />
           {busy ? 'Queueing…' : 'Run ' + (selected.length || 1) + ' simulation' + ((selected.length || 1) === 1 ? '' : 's')}
         </button>
         {!engineReady && <span className="muted" style={{ fontSize: 12 }}>No engine available.</span>}

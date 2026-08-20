@@ -57,8 +57,14 @@ let cached: LocatedSimc | undefined;
 let inFlight: Promise<LocatedSimc | undefined> | undefined;
 
 function parseBanner(text: string): string | undefined {
+  // A bare invocation prints "Nothing to sim! SimulationCraft 1210-01 for…" --
+  // its complaint about having no profile, prefixed to the banner. Keep only
+  // the banner: a version string that opens with an error erodes trust in
+  // every other number on screen.
   const line = text.split(/\r?\n/).find((l) => /SimulationCraft/i.test(l));
-  return line?.trim() || undefined;
+  if (!line) return undefined;
+  const start = line.search(/SimulationCraft/i);
+  return line.slice(start).trim() || undefined;
 }
 
 /**
