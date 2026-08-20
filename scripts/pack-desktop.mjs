@@ -18,8 +18,11 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { createWriteStream, cpSync, existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -63,6 +66,64 @@ function unstage() {
   }
   console.log('  unstaged local packages');
 }
+
+/**
+ * Pre-seeds electron-builder's winCodeSign cache, minus the macOS symlinks.
+ *
+ * On Windows, electron-builder downloads a signing-tools bundle whose archive
+ * contains darwin `.dylib` symlinks. Creating symlinks needs Developer Mode or
+ * elevation, so on a stock machine the extraction fails and aborts the whole
+ * build -- for files that are never used on Windows. Extracting the bundle
+ * ourselves and excluding the darwin tree sidesteps it; electron-builder sees
+ * the cache directory and skips its own download.
+ *
+ * CI runners are elevated and never hit this, so a present cache is simply
+ * left alone.
+ */
+async function seedWinCodeSign() {
+  if (process.platform !== 'win32') return;
+
+  const version = 'winCodeSign-2.6.0';
+  const cacheRoot = process.env.ELECTRON_BUILDER_CACHE
+    ? path.join(process.env.ELECTRON_BUILDER_CACHE, 'winCodeSign')
+    : path.join(process.env.LOCALAPPDATA ?? '', 'electron-builder', 'Cache', 'winCodeSign');
+  const target = path.join(cacheRoot, version);
+  if (existsSync(target)) return;
+
+  console.log('Seeding ' + version + ' cache (excluding darwin symlinks)...');
+  mkdirSync(cacheRoot, { recursive: true });
+
+  const url =
+    'https://github.com/electron-userland/electron-builder-binaries/releases/download/' +
+    version + '/' + version + '.7z';
+  const archive = path.join(cacheRoot, version + '.7z.part');
+
+  const res = await fetch(url, { redirect: 'follow' });
+  if (!res.ok || !res.body) throw new Error('winCodeSign download failed: HTTP ' + res.status);
+  await pipeline(Readable.fromWeb(res.body), createWriteStream(archive));
+
+  // The same 7-Zip the desktop app already bundles for its simc installer.
+  const require = createRequire(path.join(ROOT, 'package.json'));
+  const { path7za } = require('7zip-bin');
+
+  const extracted = target + '.tmp';
+  rmSync(extracted, { recursive: true, force: true });
+  const result = spawnSync(path7za, ['x', '-y', '-o' + extracted, archive, '-x!darwin'], {
+    stdio: 'inherit',
+    windowsHide: true,
+  });
+  rmSync(archive, { force: true });
+  if (result.status !== 0) {
+    rmSync(extracted, { recursive: true, force: true });
+    throw new Error('winCodeSign extraction failed (7za exit ' + result.status + ')');
+  }
+  // Rename into place last, so a half-extracted cache never looks complete.
+  cpSync(extracted, target, { recursive: true });
+  rmSync(extracted, { recursive: true, force: true });
+  console.log('  seeded ' + target);
+}
+
+await seedWinCodeSign();
 
 console.log('Staging workspace packages...');
 stage();

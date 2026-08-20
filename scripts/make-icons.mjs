@@ -187,13 +187,16 @@ function encodeIco(images) {
 
 mkdirSync(OUT, { recursive: true });
 
-const sizes = [16, 24, 32, 48, 64, 128, 256];
+// 512 exists for electron-builder's macOS icns, which requires at least
+// 512x512 and fails the build below that. ICO entries stop at 256 by format.
+const sizes = [16, 24, 32, 48, 64, 128, 256, 512];
 const rendered = sizes.map((size) => ({ size, data: renderIcon(size) }));
+const icoSizes = rendered.filter((r) => r.size <= 256);
 
-writeFileSync(path.join(OUT, 'icon.png'), rendered.find((r) => r.size === 256).data);
+writeFileSync(path.join(OUT, 'icon.png'), rendered.find((r) => r.size === 512).data);
 writeFileSync(path.join(OUT, 'tray.png'), rendered.find((r) => r.size === 32).data);
 writeFileSync(path.join(OUT, 'tray@2x.png'), rendered.find((r) => r.size === 64).data);
-writeFileSync(path.join(OUT, 'icon.ico'), encodeIco(rendered));
+writeFileSync(path.join(OUT, 'icon.ico'), encodeIco(icoSizes));
 
 for (const name of ['icon.png', 'tray.png', 'tray@2x.png', 'icon.ico']) {
   console.log('  ' + path.relative(ROOT, path.join(OUT, name)));

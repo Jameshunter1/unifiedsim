@@ -1,0 +1,124 @@
+name: Release
+
+# Tagging vX.Y.Z builds installers for all three platforms and publishes a
+# GitHub Release with checksums. workflow_dispatch runs the build legs only,
+# so the matrix can be validated without publishing anything.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: package · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # One platform failing must not cancel the others: a release with two of
+      # three installers beats no release, and the red leg stays visible.
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+
+    env:
+      # electron-builder fetches its own Electron dist; the npm module's copy
+      # is only needed to launch the app, which CI never does.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      # No signing identity exists; stop electron-builder looking for one on
+      # macOS instead of failing the build.
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Tag must match the app version
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          APP=$(node -p "require('./apps/desktop/package.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$APP" != "$TAG" ]; then
+            echo "::error::tag v$TAG but apps/desktop/package.json says $APP"
+            exit 1
+          fi
+
+      - run: npm ci
+
+      - name: Build workspaces
+        run: npm run build
+
+      - name: Package installers
+        run: node scripts/pack-desktop.mjs --publish never
+
+      - name: Collect installers
+        shell: bash
+        run: |
+          mkdir -p out
+          find apps/desktop/release -maxdepth 1 -type f \
+            \( -name '*.exe' -o -name '*.dmg' -o -name '*.AppImage' \) \
+            -exec cp {} out/ \;
+          ls -la out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: out/*
+          if-no-files-found: error
+
+  release:
+    name: publish
+    needs: build
+    # !cancelled() so a failed platform leg still releases what did build.
+    if: startsWith(github.ref, 'refs/tags/') && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Refuse an empty release
+        run: |
+          ls -la dist
+          [ -n "$(ls -A dist)" ] || { echo "::error::no installers were built"; exit 1; }
+
+      - name: Checksums
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<'NOTES'
+          Local-first World of Warcraft simulation runner — see the
+          [README](https://github.com/Jameshunter1/unifiedsim#readme) for setup.
+
+          **These builds are not code-signed.** Windows SmartScreen will warn on
+          first run, and Smart App Control (where enforced) may refuse them
+          outright — its per-binary reputation makes this non-deterministic.
+          Running from a checkout with `npm run desktop` is unaffected.
+          `SHA256SUMS.txt` covers every asset.
+          NOTES
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "UnifiedSim ${GITHUB_REF_NAME#v}" \
+              --generate-notes \
+              --notes-file notes.md
+          fi

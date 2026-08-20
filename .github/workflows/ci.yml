@@ -68,3 +68,19 @@ jobs:
             fi
           done
           exit $status
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      # Production dependencies only: Electron 33 once sat end-of-life with 14
+      # advisories and nothing surfaced it in CI. Dev tooling stays advisory --
+      # it does not ship to users and would make this gate flaky.
+      - name: npm audit (production, high+)
+        run: npm audit --omit=dev --audit-level=high
