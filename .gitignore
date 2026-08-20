@@ -1,0 +1,20 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.env
+.env.local
+
+# Runtime state: profile store, run history, raw simc output
+data/
+!data/.gitkeep
+
+# Vendored SimulationCraft binary + build trees
+vendor/
+engine-wasm/build/
+engine-wasm/simc-src/
+engine-wasm/dist/
+emsdk/
+
+# Desktop packaging output (hundreds of MB) and its temporary staging area
+apps/desktop/release/
+apps/desktop/node_modules/

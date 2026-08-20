@@ -1,0 +1,133 @@
+# Darvage - Frost - 2026-08-19 16:36 - US/Tichondrius
+# SimC Addon 12.1.0-02
+# WoW 12.1.0.69382, TOC 120100
+# Requires SimulationCraft 1000-01 or newer
+
+mage="Darvage"
+level=90
+race=undead
+region=us
+server=tichondrius
+role=spell
+professions=tailoring=60/enchanting=65
+spec=frost
+# loot_spec=frost
+
+talents=CAEAche08tHz49KSVf7iKFnyuZGGLzMzsMmZmYmxYmZmZWMzMzMzMzsMTzMbzCAAAaBAAAAAAAw2yYmZGMbzYmZstAAAAmZwMMGwAYA
+
+# Saved Loadout: Delves
+# talents=CAEAche08tHz49KSVf7iKFnyuZGGLzMzswMzgZmZmZmZmZxMzwMmBAAAmZmZZZmxGAAAAAAsAw22YmZGMbDjZGbAAAMzGwMMGwMYA
+# Saved Loadout: Frost Raid
+# talents=CAEAche08tHz49KSVf7iKFnyuZGGLzMzsMmZGMzYMzMzMLmZmZmZmZWmxMz2sAAAALAAAAAAAA2WGzMzgZbGzMjtFAAAwMDmhxAGAD
+# Saved Loadout: Frost PVP
+# talents=CAEAche08tHz49KSVf7iKFnyuNmtlZWmZmZDzMYGmZmZmZWMzMjZMDAAAMzMzyyMjNAAYBAAAsBw2yYmZALzDYMzYBAAgZWAmhxMgBDA
+# Saved Loadout: Frost M+
+# talents=CAEAche08tHz49KSVf7iKFnyuNzwYZmZmFMzgZGzMzMzMLmZmZmZmZWmxMz2sAAAALAAwCAAAAAbLjZmZwsNjZmx2CAAAYmBzwYADgB
+
+omnium_talents=136814:1/136820:1/136817:1/136816:1/136822:1
+
+# Venom-Cursed Dragonhawk's Plumage (292)
+head=,id=277792,bonus_id=12833/41/13696/13662
+# Venomous Aspirant's Necklace (263)
+neck=,id=270534,bonus_id=13650/13657,content_tuning=3321
+# Brood Cleanser's Amice (292)
+shoulder=,id=239031,enchant_id=7971,bonus_id=12833/13439/6652/13662/12699,content_tuning=1226
+# Preyhunter's Polished Cloak (279)
+back=,id=275525,bonus_id=12825/6652/13662,content_tuning=5223
+# Venom-Cursed Dragonhawk's Robes (285)
+chest=,id=277795,bonus_id=12827/6652/13662,content_tuning=5381
+# Venom-Cursed Dragonhawk's Wristbands (285)
+wrist=,id=277788,bonus_id=12827/6652/13696/13662,content_tuning=5381
+# Deepvine Grips (279)
+hands=,id=256980,bonus_id=12825/6652/13662,content_tuning=3321
+# Deepvine Waistguard (279)
+waist=,id=257020,bonus_id=12825/6652/13696/13662,content_tuning=7442
+# Venomous Aspirant's Silk Leggings (263)
+legs=,id=270523,bonus_id=13650/13657,content_tuning=3321
+# Shadowthread Slippers (272)
+feet=,id=264531,bonus_id=6652/13663/11311/12819,content_tuning=3321
+# Soulcoiler's Signet (282)
+finger1=,id=276035,enchant_id=7964,bonus_id=12826/6652/13668,content_tuning=6145
+# Preyhunter's Ring (292)
+finger2=,id=275528,enchant_id=7964,bonus_id=12833/6652/13668,content_tuning=5236
+# Spirit-Rending Poison (289)
+trinket1=,id=274497,bonus_id=6652/12828,content_tuning=5381
+# Lightspire Core (302)
+trinket2=,id=250214,bonus_id=12836/13439/6652/12699
+# Crackling Jade Kilij (292)
+main_hand=,id=160216,bonus_id=12833/13439/6652/12701,content_tuning=3595
+# Venom-Cursed Spellfang (285)
+off_hand=,id=277798,bonus_id=12827/6652,content_tuning=5381
+
+### Gear from Bags
+#
+# Bright Linen Fishing Hat (180)
+# head=,id=239644,bonus_id=12252/12251/12498,content_tuning=3615,crafting_quality=1
+#
+# Venomous Aspirant's Silk Cover (263)
+# head=,id=270524,bonus_id=13650/13657/13554,content_tuning=3321
+#
+# Preyhunter's Refined Epaulet (292)
+# shoulder=,id=275499,bonus_id=12833/6652/13662,content_tuning=5236
+#
+# Venomous Aspirant's Silk Mantle (263)
+# shoulder=,id=270521,bonus_id=13650/13657,content_tuning=3321
+#
+# Courtly Shoulders (201)
+# shoulder=,id=239675,bonus_id=12247/12246/12493,content_tuning=3615,crafted_stats=40/36,crafting_quality=1
+#
+# Venomous Aspirant's Cloak (263)
+# back=,id=270540,bonus_id=13650/13657,content_tuning=3321
+#
+# Amani Summoning Shawl (279)
+# back=,id=268248,bonus_id=6652/13662/13332/12825/11215,content_tuning=7359
+#
+# Venomous Warmonger's Garb (269)
+# chest=,id=270351,bonus_id=12818/13659/13663,content_tuning=5381
+#
+# Venomous Aspirant's Silk Bindings (263)
+# wrist=,id=270516,bonus_id=13650/13657/13554,content_tuning=3321
+#
+# Venomous Aspirant's Silk Gloves (263)
+# hands=,id=270527,bonus_id=13650/13657,content_tuning=3321
+#
+# Venomous Aspirant's Silk Cord (263)
+# waist=,id=270519,bonus_id=13650/13657/13554,content_tuning=3321
+#
+# Venomous Aspirant's Silk Treads (263)
+# feet=,id=270529,bonus_id=13650/13657,content_tuning=3321
+#
+# Noble's Signet Ring (1)
+# finger1=,id=265814,bonus_id=13639,content_tuning=3321
+#
+# Venomous Aspirant's Band (263)
+# finger1=,id=270536,bonus_id=13650/13657,content_tuning=3321
+#
+# Venomous Aspirant's Ring (263)
+# finger1=,id=270537,bonus_id=13650/13657,content_tuning=3321
+#
+# Tangle of Vibrant Vines (266)
+# trinket1=,id=252957,bonus_id=6652/12817,content_tuning=3320
+#
+# Venomous Aspirant's Medallion (263)
+# trinket1=,id=270556,bonus_id=13650/13657,content_tuning=3321
+#
+# Venomous Aspirant's Insignia of Alacrity (263)
+# trinket1=,id=270558,bonus_id=13650/13657,content_tuning=3321
+#
+# Venomous Aspirant's Stave (263)
+# main_hand=,id=270450,bonus_id=13650/13657,content_tuning=3321
+
+### Additional Character Info
+#
+# catalyst_currencies=3269:8/3378:8/2813:8/3116:8
+#
+# upgrade_currencies=c:1792:4654/c:3442:135/c:3445:10/c:3443:235/c:3444:200/i:256608:9/i:275380:1/i:274476:4/i:232875:5/i:256559:10
+#
+# slot_high_watermarks=0:292:292/1:263:263/2:292:292/3:285:285/4:279:279/5:279:279/6:272:272/7:285:285/8:279:279/9:282:282/10:289:289/11:279:279/12:263:263/13:292:292/14:0:83/15:0:80/16:285:285
+#
+# upgrade_achievements=19577/19578/19579/40107
+#
+# bonus_roll_currencies=3418:0/3511:0
+
+# Checksum: f53c0df2

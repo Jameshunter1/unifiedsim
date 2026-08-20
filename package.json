@@ -1,0 +1,30 @@
+{
+  "name": "wow-unified-sim",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Unified WoW simulation & optimization platform: in-game addon -> local bridge -> hybrid sim engine.",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace=@usim/server & npm run dev --workspace=@usim/web",
+    "dev:server": "npm run dev --workspace=@usim/server",
+    "dev:web": "npm run dev --workspace=@usim/web",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "simc:fetch": "node scripts/fetch-simc.mjs",
+    "addon:link": "node scripts/link-addon.mjs",
+    "simc:docker": "node scripts/build-simc-image.mjs",
+    "desktop": "npm run build --workspace=@usim/simc-profile && npm run build --workspace=@usim/server && npm run build --workspace=@usim/web && npm run build --workspace=@usim/desktop && npm start --workspace=@usim/desktop",
+    "desktop:dev": "npm run build --workspace=@usim/desktop && npm start --workspace=@usim/desktop",
+    "desktop:pack": "npm run build && node scripts/pack-desktop.mjs --dir",
+    "desktop:dist": "npm run build && node scripts/pack-desktop.mjs",
+    "icons": "node scripts/make-icons.mjs"
+  }
+}
