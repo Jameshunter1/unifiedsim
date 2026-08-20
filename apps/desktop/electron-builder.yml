@@ -1,0 +1,85 @@
+appId: dev.unifiedsim.app
+productName: UnifiedSim
+copyright: UnifiedSim
+
+directories:
+  output: release
+  buildResources: resources
+
+# Do not let electron-builder run its own `npm install` before packaging.
+#
+# In an npm workspace that install targets apps/desktop but rewires the *root*
+# node_modules, pruning devDependencies — including electron-builder's own
+# app-builder-bin — so the build then fails with ENOENT on its own binary. The
+# step exists to rebuild native modules against Electron's ABI, and this app has
+# none: the dependency tree is express, cors and two local TypeScript packages.
+npmRebuild: false
+
+# 7zip-bin ships platform executables. A binary cannot be run from inside an
+# asar, so this one is unpacked beside it.
+asarUnpack:
+  - node_modules/7zip-bin/**/*
+
+# Only the shell's own code. Production dependencies (@usim/server and its
+# transitive deps) are resolved and included by electron-builder itself; in this
+# npm workspace they are hoisted to the repo root, which it understands.
+files:
+  - dist/**/*
+  - launch.mjs
+  - package.json
+  - '!**/*.map'
+  - '!**/*.ts'
+  # @usim/server and @usim/simc-profile are staged into
+  # apps/desktop/node_modules by scripts/pack-desktop.mjs before this runs, so
+  # they are picked up as ordinary local dependencies. See that script for why.
+  - node_modules/@usim/**/*
+
+# Everything the app reads at runtime but does not import.
+#
+# The built UI ships as plain files rather than inside the asar so the server
+# can serve it with express.static, and the addon ships unpacked so it can be
+# copied into the WoW AddOns folder.
+extraResources:
+  - from: ../web/dist
+    to: web
+  - from: ../../addon
+    to: addon
+  - from: resources/icon.png
+    to: icon.png
+  - from: resources/icon.ico
+    to: icon.ico
+  - from: resources/tray.png
+    to: tray.png
+  - from: resources/tray@2x.png
+    to: tray@2x.png
+
+win:
+  icon: resources/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: UnifiedSim
+
+mac:
+  icon: resources/icon.png
+  category: public.app-category.games
+  target: [dmg]
+
+linux:
+  icon: resources/icon.png
+  category: Game
+  target: [AppImage]
+
+# No code signing configured. On Windows this means SmartScreen warns on first
+# run, and Smart App Control -- which is enforced on some machines -- may refuse
+# the installer outright. Signing needs a certificate the project does not have;
+# until then the supported path is running from a checkout via `npm run desktop`.

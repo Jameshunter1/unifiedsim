@@ -1,0 +1,28 @@
+{
+  "name": "@usim/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "UnifiedSim desktop shell",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node launch.mjs",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "electron": "33.4.11",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@usim/server": "*",
+    "@usim/simc-profile": "*",
+    "7zip-bin": "^5.2.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  },
+  "author": "UnifiedSim"
+}
