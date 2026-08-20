@@ -1,0 +1,12 @@
+## Interface: 120100
+## Title: UnifiedSim
+## Notes: Snapshots your character as a SimulationCraft profile and hands it to the local UnifiedSim bridge.
+## Author: WoWProject
+## Version: 0.1.0
+## SavedVariables: UnifiedSimDB
+## IconTexture: Interface\Icons\INV_Misc_PocketWatch_01
+## X-Category: Combat
+
+Data.lua
+Serializer.lua
+Core.lua
