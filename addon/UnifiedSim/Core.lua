@@ -150,7 +150,13 @@ SlashCmdList.UNIFIEDSIM = function(msg)
         end
         if snapshot("manual") then
             say("snapshot taken, reloading so the bridge can see it...")
-            C_Timer.After(0.2, ReloadUI)
+            -- Reload synchronously, inside the slash handler. The handler still
+            -- carries the hardware-event context of the Enter keypress; a timer
+            -- callback does not, and the client refuses the reload from there
+            -- ("Interface action failed because of an AddOn"), which strands
+            -- the snapshot in memory where the bridge can never see it.
+            local reload = (C_UI and C_UI.Reload) or ReloadUI
+            reload()
         end
         return
     end
