@@ -14,6 +14,7 @@ import {
   type ProfileVariant,
 } from '@usim/simc-profile';
 
+import { computeGearStats, type GearStatsResult } from '../engines/gearStats.js';
 import { events } from '../events.js';
 import { store, type StoredProfile } from '../store.js';
 
@@ -164,6 +165,49 @@ profilesRouter.get('/:id/variants', (req, res) => {
     /** Full cross-product, for deciding when a search needs more than one box. */
     exhaustiveCount: permutationCount(candidatesPerSlot, talents.length),
   });
+});
+
+/**
+ * Per-item stats for everything equipped and everything in bags.
+ *
+ * Computed by simc itself, so the bonus IDs are applied exactly as they are in
+ * game. Cached per profile: a profile's text never changes once stored, so the
+ * answer cannot go stale, and the work is a few hundred milliseconds per pass.
+ */
+const gearStatsCache = new Map<string, GearStatsResult>();
+const gearStatsInFlight = new Map<string, Promise<GearStatsResult>>();
+
+profilesRouter.get('/:id/gear-stats', async (req, res) => {
+  const stored = store.getProfile(req.params.id);
+  if (!stored) {
+    res.status(404).json({ error: 'No such profile.' });
+    return;
+  }
+
+  const cached = gearStatsCache.get(stored.id);
+  if (cached) {
+    res.json({ ...cached, cached: true });
+    return;
+  }
+
+  try {
+    // Collapse concurrent requests: the UI asks on profile select, and a
+    // remount would otherwise start a second set of simc processes.
+    let work = gearStatsInFlight.get(stored.id);
+    if (!work) {
+      work = computeGearStats(parseProfile(stored.raw));
+      gearStatsInFlight.set(stored.id, work);
+    }
+    const result = await work;
+    gearStatsCache.set(stored.id, result);
+    res.json({ ...result, cached: false });
+  } catch (err) {
+    // No engine, or simc refused the profile. The UI degrades to item level
+    // only, so this is a soft failure.
+    res.status(503).json({ error: (err as Error).message });
+  } finally {
+    gearStatsInFlight.delete(stored.id);
+  }
 });
 
 /** Renders the exact simc text a run would use. Useful for debugging a variant. */

@@ -104,6 +104,32 @@ export interface GearSwapVariant extends Variant {
   itemLevelDelta?: number;
 }
 
+/** Per-item stats, as simc resolves them with bonus IDs applied. */
+export interface ItemStats {
+  itemLevel?: number;
+  intellect?: number;
+  agility?: number;
+  strength?: number;
+  stamina?: number;
+  crit?: number;
+  haste?: number;
+  mastery?: number;
+  versatility?: number;
+  leech?: number;
+  speed?: number;
+  avoidance?: number;
+}
+
+export interface GearStats {
+  stats: Record<string, ItemStats>;
+  /** Keys this character cannot wear -- wrong armour class. */
+  unequippable: string[];
+  /** Keys simc accepted but produced no stats for. */
+  unresolved: string[];
+}
+
+export const statsKey = (slot: string, itemId: number) => slot + ':' + itemId;
+
 /** Bag alternates for one slot, with whatever is currently worn there. */
 export interface SlotGroup {
   slot: string;
@@ -207,6 +233,8 @@ export const api = {
       suggestedCount: number;
       exhaustiveCount: number;
     }>('/profiles/' + id + '/variants'),
+
+  gearStats: (id: string) => request<GearStats>('/profiles/' + id + '/gear-stats'),
 
   runs: (profileId?: string) =>
     request<{ runs: SimRun[]; queue: { queued: number; running: number } }>(

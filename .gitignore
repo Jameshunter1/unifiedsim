@@ -20,3 +20,6 @@ emsdk/
 # Desktop packaging output (hundreds of MB) and its temporary staging area
 apps/desktop/release/
 apps/desktop/node_modules/
+
+# Scratch profiles written while reading item stats out of simc
+data/gear-stats/

@@ -6,10 +6,14 @@ import {
   type Health,
   type Profile,
   type ProfileDetail,
+  statsKey,
+  type GearStats,
+
   type SlotGroup,
   type Variant,
 } from '../api.ts';
-import { IconExternal, IconPlay, IconSearch, IconTrash, SlotIcon } from './Icons.tsx';
+import { IconPlay, IconSearch, IconTrash, SlotIcon } from './Icons.tsx';
+import { ItemCard } from './ItemCard.tsx';
 import { Hint, Tooltip } from './Tooltip.tsx';
 
 /* ----------------------------------------------------------------- status */
@@ -372,6 +376,7 @@ export function LaunchPanel({
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [tab, setTab] = useState<'talents' | 'gear'>('talents');
   const [filter, setFilter] = useState('');
+  const [gearStats, setGearStats] = useState<GearStats | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -397,6 +402,15 @@ export function LaunchPanel({
         setExhaustive(v.exhaustiveCount);
       })
       .catch((err) => setError((err as Error).message));
+
+    // Item stats come from simc itself, which takes a few seconds the first
+    // time per profile. Fetched separately so the picker is usable immediately
+    // and fills in; a failure here degrades to item level rather than blocking.
+    setGearStats(null);
+    api
+      .gearStats(profileId)
+      .then(setGearStats)
+      .catch(() => setGearStats(null));
   }, [profileId]);
 
   useEffect(() => {
@@ -477,7 +491,12 @@ export function LaunchPanel({
       ...baseline,
       label: group.equipped ? 'Equipped: ' + withIlvl(group.equipped) : 'Equipped: nothing',
     };
-    const candidates = group.candidates.map((v) => ({ ...v, label: withIlvl(v.candidate) }));
+    // Skip anything simc says this character cannot wear; including it would
+    // fail that run with "Invalid type" and nothing else.
+    const wearable = group.candidates.filter(
+      (v) => !gearStats?.unequippable.includes(statsKey(group.slot, v.candidate.id)),
+    );
+    const candidates = wearable.map((v) => ({ ...v, label: withIlvl(v.candidate) }));
     return launchVariants([reference, ...candidates]);
   };
 
@@ -567,18 +586,35 @@ export function LaunchPanel({
                     <SlotIcon slot={group.slot} size={13} className="icon" />
                     {group.slot.replace('_', ' ')}
                   </span>
-                  <span className="muted">
-                    {group.equipped ? group.equipped.name : 'empty'}
-                    {group.equipped?.itemLevel ? ' · ' + group.equipped.itemLevel : ''}
-                  </span>
+                  {group.equipped ? (
+                    <Tooltip
+                      placement="right"
+                      content={
+                        <ItemCard
+                          name={group.equipped.name}
+                          itemId={group.equipped.id}
+                          slot={group.slot}
+                          itemLevel={group.equipped.itemLevel}
+                          stats={gearStats}
+                          equipped
+                        />
+                      }
+                    >
+                      <span className="muted equipped-name">
+                        {group.equipped.name}
+                        {group.equipped.itemLevel ? ' · ' + group.equipped.itemLevel : ''}
+                      </span>
+                    </Tooltip>
+                  ) : (
+                    <span className="muted">empty</span>
+                  )}
                 </div>
                 <Tooltip
                   content={
                     <>
                       <strong>Compare this slot</strong>
-                      Sims {group.candidates.length} alternate
-                      {group.candidates.length === 1 ? '' : 's'} against what you have equipped, and
-                      ranks them by DPS.
+                      Sims each wearable alternate against what you have equipped, and ranks
+                      them by DPS.
                       <div className="tt-note">
                         Your equipped item is always included, so the percentages mean something.
                       </div>
@@ -601,43 +637,28 @@ export function LaunchPanel({
                   key={c.label}
                   placement="right"
                   content={
-                    <>
-                      <strong>{c.candidate.name}</strong>
-                      <div className="tt-row">
-                        <span>Item level</span>
-                        <span>{c.candidate.itemLevel ?? 'unknown'}</span>
-                      </div>
-                      <div className="tt-row">
-                        <span>Replaces</span>
-                        <span>{c.replaces?.name ?? 'nothing'}</span>
-                      </div>
-                      {c.itemLevelDelta !== undefined && (
-                        <div className="tt-row">
-                          <span>Item level change</span>
-                          <span>
-                            {c.itemLevelDelta > 0 ? '+' : ''}
-                            {c.itemLevelDelta}
-                          </span>
-                        </div>
-                      )}
-                      <div className="tt-note">
-                        Item level is not DPS. Sim the slot to find out which actually wins.
-                      </div>
-                      <a
-                        className="item-link"
-                        href={'https://www.wowhead.com/item=' + c.candidate.id}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        <IconExternal size={12} className="icon" />
-                        Open on Wowhead
-                      </a>
-                    </>
+                    <ItemCard
+                      name={c.candidate.name}
+                      itemId={c.candidate.id}
+                      slot={group.slot}
+                      itemLevel={c.candidate.itemLevel}
+                      stats={gearStats}
+                      compareTo={group.equipped}
+                      replacesName={c.replaces?.name}
+                    />
                   }
                 >
-                <label className="gear-row">
+                <label
+                  className={
+                    'gear-row' +
+                    (gearStats?.unequippable.includes(statsKey(group.slot, c.candidate.id))
+                      ? ' unequippable'
+                      : '')
+                  }
+                >
                   <input
                     type="checkbox"
+                    disabled={gearStats?.unequippable.includes(statsKey(group.slot, c.candidate.id))}
                     checked={picked.has(c.label)}
                     onChange={() => toggle(c.label)}
                   />

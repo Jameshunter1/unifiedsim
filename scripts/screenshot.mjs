@@ -155,17 +155,27 @@ try {
    * onto an element, because a synthetic mouseover would not exercise CSS
    * :hover or React's own enter handling the same way.
    */
-  const clickText = val('click', null);
-  if (clickText) {
+  // --click may be repeated, and takes either a CSS selector or the visible
+  // text of a control. Repeating it is how you reach a panel that is more than
+  // one step in: pick a profile, then open its gear tab.
+  const clickTargets = argv.reduce((acc, arg, i) => {
+    if (arg === '--click' && argv[i + 1]) acc.push(argv[i + 1]);
+    return acc;
+  }, []);
+
+  for (const target of clickTargets) {
+    const isSelector = /^[.#[]/.test(target);
     const clicked = await client.send('Runtime.evaluate', {
-      expression:
-        '(() => { const t = ' + JSON.stringify(clickText) + ';' +
-        " const el = [...document.querySelectorAll('button, [role=tab], a')]" +
-        '   .find((b) => (b.textContent || "").includes(t));' +
-        ' if (el) el.click(); return Boolean(el); })()',
+      expression: isSelector
+        ? '(() => { const el = document.querySelector(' + JSON.stringify(target) + ');' +
+          ' if (el) el.click(); return Boolean(el); })()'
+        : '(() => { const t = ' + JSON.stringify(target) + ';' +
+          " const el = [...document.querySelectorAll('button, [role=tab], a')]" +
+          '   .find((b) => (b.textContent || "").includes(t));' +
+          ' if (el) el.click(); return Boolean(el); })()',
       returnByValue: true,
     });
-    if (!clicked.result?.value) throw new Error('No control found containing text: ' + clickText);
+    if (!clicked.result?.value) throw new Error('Nothing to click for: ' + target);
     await sleep(700);
   }
 
